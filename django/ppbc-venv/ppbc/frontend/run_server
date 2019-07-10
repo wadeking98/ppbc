@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+if [[ "$1" == "help" ]]
+then
+	echo got here
+else
+	./node_modules/.bin/vue-cli-service $1
+fi
