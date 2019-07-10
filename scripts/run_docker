@@ -20,4 +20,4 @@ if [ ! -z "${WEBHOOK_URL}" ]; then
 fi
 
 RAND_NAME=$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)
-docker run --rm -ti --name "aries-cloudagent-runner_${RAND_NAME}" $ARGS aries-cloudagent-run "$@"
+docker run --rm -ti --net=aries_net --name "aries-cloudagent-runner_${RAND_NAME}" $ARGS aries-cloudagent-run "$@"

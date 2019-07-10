@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+ip=$(docker run --net=host codenvy/che-ip);
+# let "admin = 5000 + $2";
+# let "in = 8000 + $2";
+# let "out = 10000 + $2";
+PORTS="5000:5000 10000:10000" ./scripts/run_docker -it http 0.0.0.0 10000 \
+        -ot http --admin 0.0.0.0 5000 \
+        -e "http://172.17.0.1:10000" \
+        --genesis-url "http://172.17.0.1:9000/genesis" \
+        --seed 00000000000000000000000000000000 \
+        --auto-ping-connection \
+        --accept-invites \
+        --accept-requests \
+        --auto-verify-presentation \
+        --auto-respond-credential-offer \
+        --auto-respond-presentation-request \
+        --wallet-name aries \
+        --wallet-type indy \
+        --wallet-key key \
+        --wallet-storage-type postgres_storage \
+        --wallet-storage-config '{"url":"172.0.0.5:5432", "max_connections":5}' \
+        --wallet-storage-creds '{"account":"postgres","password":"docker","admin_account":"postgres","admin_password":"docker"}' \
+        --wallet-name "issuer"
+        --label "issuer"
