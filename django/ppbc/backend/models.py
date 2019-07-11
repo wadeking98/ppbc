@@ -2,28 +2,12 @@ from django.db import models
 from django.contrib.auth.models import User
 from django import forms
 import subprocess
-
-# Create your models here.
-
-# class client(models.Model):
-#     first_name = models.CharField(max_length=50)
-#     last_name = models.CharField(max_length=50)
-#     email = models.EmailField(max_length=50)
-#     password = models.CharField(max_length=64)
-#     usr_port = models.IntegerField()
-#     def __str__(self):
-#         return self.first_name
-
-# class org(models.Model):
-#     client = models.ForeignKey(client, on_delete=models.CASCADE)
-#     org_name = models.CharField(max_length=100)
-#     org_role = models.CharField(max_length=100)
-#     def __str__(self):
-#         return self.org_name
+import os
+import socket
 
 class user_profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    usr_port = models.IntegerField()
+    health_id = models.CharField(max_length=20)
     def __str__(self):
         return self.user.__str__()
 
@@ -31,24 +15,38 @@ class org_profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     org_name = models.CharField(max_length=100)
     org_role = models.CharField(max_length=100)
-    usr_port = models.IntegerField()
     def __str__(self):
         return self.org_name
 
 class agent(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    inbound_trans = models.IntegerField()
-    outbound_trans = models.IntegerField()
     seed = models.CharField(max_length=32)
     name = models.CharField(max_length=100)
     wallet_name = models.CharField(max_length=150)
     def __str__(self):
         return self.user.__str__()
     
-    def start(self, script_dir):
-        subprocess.run([script_dir+"run_agent", 
-        self.outbound_trans, 
-        self.inbound_trans,
-        self.seed,
-        self.name,
-        self.wallet_name])
+    
+
+class active_agent(models.Model):
+    agent = models.OneToOneField(agent, on_delete=models.CASCADE)
+    login_date = models.DateTimeField()
+    agent_proc = None
+
+    def start(self):
+        agent_proc = subprocess.Popen([os.path.join("../../","run_agent"), 
+        ""+str(5000), 
+        ""+str(10000),
+        ""+str(self.agent.seed),
+        ""+str(self.agent.name),
+        ""+str(self.agent.wallet_name),
+        "../../scripts/"], stdout=subprocess.PIPE)
+    
+    def kill(self):
+        if agent_proc is not None:
+            agent_proc.kill()
+    
+    def __str__(self):
+        return self.agent.__str__()
+
+    

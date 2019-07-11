@@ -4,3 +4,4 @@ from .models import *
 admin.site.register(user_profile)
 admin.site.register(org_profile)
 admin.site.register(agent)
+admin.site.register(active_agent)

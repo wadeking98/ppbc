@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-PORTS="$1:$1 $2:$2" ./scripts/run_docker -it http 0.0.0.0 $2 \
+PORTS="$1:$1 $2:$2" $6run_docker -it http 0.0.0.0 $2 \
         -ot http --admin 0.0.0.0 $1 \
         -e "http://172.17.0.1:$2" \
         --genesis-url "http://172.17.0.1:9000/genesis" \

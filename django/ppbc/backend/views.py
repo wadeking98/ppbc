@@ -2,11 +2,22 @@ from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import authenticate
 import json
-from pbkdf2 import crypt
 from .models import *
+import datetime
 # Create your views here.
 def test(request):
     return HttpResponse(request.session.get('auth', False))
+
+def start_agent(agent, active):
+    print(agent)
+    p = subprocess.Popen([os.path.join("../../","run_agent"), 
+    ""+str(active.outbound_trans), 
+    ""+str(active.inbound_trans),
+    ""+str(agent.seed),
+    ""+str(agent.name),
+    ""+str(agent.wallet_name),
+    "../../scripts/"], stdout=subprocess.PIPE)
+
 
 def signup(request):
     if request.method == 'POST':
@@ -16,23 +27,34 @@ def signup(request):
         last_name = data.get('last_name')
         email = data.get('email')
         password = data.get('password1')
-        port = 1234
 
+        #create a user object
         u = User.objects.create_user(username=email, password=password, email=email, first_name=first_name, last_name=last_name)
         u.save()
 
-        it = 10000
-        ot = 5000
+        #link additional data to user profile
+        usr_prof = user_profile(user=u, health_id='1234')
+        usr_prof.save()
+
+
         seed = "00000000000000000000000000000000"
         name = first_name
         wallet_name = 'i_'+email.replace('@', '_').replace('.','_')
 
-        user_agent = agent(user=u, inbound_trans=it, outbound_trans=ot, seed=seed, name=name, wallet_name=wallet_name)
+        #store the user id as a cookie
+        request.session['auth'] = True
+        request.session['wallet'] = wallet_name
+        request.session.set_expiry(0)
+
+        #create an agent for the user
+        user_agent = agent(user=u, seed=seed, name=name, wallet_name=wallet_name)
         user_agent.save()
 
-        usr_prof = user_profile(user=u, usr_port=port)
-        usr_prof.save()
-
+        #register the agent as active
+        act_agent = active_agent(agent=user_agent, login_date=datetime.datetime.now())
+        act_agent.save()
+        act_agent.start()
+        
     return HttpResponse(request.POST['first_name'])
 
 def org_signup(request):
@@ -71,9 +93,17 @@ def signin(request):
 def logout(request):
     if request.method == 'GET':
         try:
-            del request.session['auth']
+            #remove the authenticaiton cookie
+            #del request.session['auth']
+
+            #get the active agent and kill the process and remove it from running agents
+            # agent_obj = agent.objects.get(wallet_name=request.session['wallet'])
+            # agent_proc = agent.objects.get(id=agent_obj.id)
+            # agent_proc.kill()
+            # agent_proc.delete()
+            # print(agent_proc)
         except KeyError:
-            pass
+            print("key error")
     return HttpResponse('logout successful')
 
 def list_conn(request):
@@ -86,7 +116,7 @@ def list_usr(request):
     return HttpResponse(json.dumps(['Wade']))
 
 def wallet(request):
-    return JsonResponse({'wallet':'i_wade_king'})
+    return JsonResponse({'wallet':request.session['wallet']})
 
 def conn(request):
     return HttpResponse("hello from conn!")
