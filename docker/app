@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 docker network create --driver=bridge --subnet=172.0.0.0/16 aries_net
 docker run --rm --name pg_db -e POSTGRES_PASSWORD=docker -d postgres
-docker network connect --ip 172.0.0.5 aries_net pg_db
+docker network connect --ip 172.0.0.5 aries_net pg_db 

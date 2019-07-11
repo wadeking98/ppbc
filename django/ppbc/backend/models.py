@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django import forms
+import subprocess
 
 # Create your models here.
 
@@ -32,3 +34,21 @@ class org_profile(models.Model):
     usr_port = models.IntegerField()
     def __str__(self):
         return self.org_name
+
+class agent(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    inbound_trans = models.IntegerField()
+    outbound_trans = models.IntegerField()
+    seed = models.CharField(max_length=32)
+    name = models.CharField(max_length=100)
+    wallet_name = models.CharField(max_length=150)
+    def __str__(self):
+        return self.user.__str__()
+    
+    def start(self, script_dir):
+        subprocess.run([script_dir+"run_agent", 
+        self.outbound_trans, 
+        self.inbound_trans,
+        self.seed,
+        self.name,
+        self.wallet_name])

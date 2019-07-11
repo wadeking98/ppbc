@@ -13,6 +13,7 @@ __pycache__/
 # Distribution / packaging
 .Python
 node_modules/
+migrations/
 build/
 develop-eggs/
 dist/

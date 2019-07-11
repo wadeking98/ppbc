@@ -21,6 +21,15 @@ def signup(request):
         u = User.objects.create_user(username=email, password=password, email=email, first_name=first_name, last_name=last_name)
         u.save()
 
+        it = 10000
+        ot = 5000
+        seed = "00000000000000000000000000000000"
+        name = first_name
+        wallet_name = 'i_'+email.replace('@', '_').replace('.','_')
+
+        user_agent = agent(user=u, inbound_trans=it, outbound_trans=ot, seed=seed, name=name, wallet_name=wallet_name)
+        user_agent.save()
+
         usr_prof = user_profile(user=u, usr_port=port)
         usr_prof.save()
 
