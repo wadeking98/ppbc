@@ -8,15 +8,7 @@ import datetime
 def test(request):
     return HttpResponse(request.session.get('auth', False))
 
-def start_agent(agent, active):
-    print(agent)
-    p = subprocess.Popen([os.path.join("../../","run_agent"), 
-    ""+str(active.outbound_trans), 
-    ""+str(active.inbound_trans),
-    ""+str(agent.seed),
-    ""+str(agent.name),
-    ""+str(agent.wallet_name),
-    "../../scripts/"], stdout=subprocess.PIPE)
+
 
 
 def signup(request):
@@ -49,11 +41,12 @@ def signup(request):
         #create an agent for the user
         user_agent = agent(user=u, seed=seed, name=name, wallet_name=wallet_name)
         user_agent.save()
+        user_agent.start()
 
         #register the agent as active
-        act_agent = active_agent(agent=user_agent, login_date=datetime.datetime.now())
-        act_agent.save()
-        act_agent.start()
+        # act_agent = active_agent(agent=user_agent, login_date=datetime.datetime.now())
+        # act_agent.save()
+        # act_agent.start()
         
     return HttpResponse(request.POST['first_name'])
 
@@ -93,15 +86,18 @@ def signin(request):
 def logout(request):
     if request.method == 'GET':
         try:
+            pass
             #remove the authenticaiton cookie
             #del request.session['auth']
 
             #get the active agent and kill the process and remove it from running agents
-            # agent_obj = agent.objects.get(wallet_name=request.session['wallet'])
-            # agent_proc = agent.objects.get(id=agent_obj.id)
-            # agent_proc.kill()
+            agent_obj = agent.objects.get(wallet_name=request.session['wallet'])
+            agent_proc = active_agent.objects.get(agent_id=agent_obj.id)
+            os.kill(agent_proc.pid, signal.SIGKILL)
+            #print(agent_proc.pid)
+            # agent_proc.stop()
             # agent_proc.delete()
-            # print(agent_proc)
+            #print(agent_proc)
         except KeyError:
             print("key error")
     return HttpResponse('logout successful')
