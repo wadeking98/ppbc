@@ -5,6 +5,7 @@ import subprocess
 import os, signal
 import socket
 import datetime
+import pickle
 
 class user_profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -24,6 +25,8 @@ class agent(models.Model):
     seed = models.CharField(max_length=32)
     name = models.CharField(max_length=100)
     wallet_name = models.CharField(max_length=150)
+    
+
 
     def start(self):
         #allocate two free ports, one to inbound transport (where the 
@@ -55,13 +58,12 @@ class agent(models.Model):
                 "--wallet-storage-type", "postgres_storage",
                 "--wallet-storage-config", "{\"url\":\"172.0.0.5:5432\", \"max_connections\":5, \"connection_timeout\":10}",
                 "--wallet-storage-creds", "{\"account\":\"postgres\",\"password\":\"docker\",\"admin_account\":\"postgres\",\"admin_password\":\"docker\"}",
-                "--label", self.name], env=agent_env, encoding="utf-8",)
+                "--label", self.name],stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=agent_env, encoding="utf-8",)
             #grab the process id of the agent
             pid = proc.pid
 
-            #save active agent to the active_agents table
-            agent_proc = active_agent(agent=self, inbound_trans=it, outbound_trans=ot, pid=pid, login_date=datetime.datetime.now())
-            agent_proc.save()
+            act_agent = active_agent(agent=self,inbound_trans=it,outbound_trans=ot,pid=pid,login_date=datetime.datetime.now())
+            act_agent.save()
             
             #return the agent process
             return proc
@@ -78,7 +80,7 @@ class agent(models.Model):
 
     
     def stop(self):
-        #TODO this function should kill the running agent process
+        print(self.proc)
         pass
 
     def __str__(self):

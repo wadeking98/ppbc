@@ -6,14 +6,19 @@ import requests
 from .models import *
 import datetime
 from .tools import *
+import pickle
 processes = {}
+test_logout = None
+test = None
 
 # Create your views here.
 def test(request):
-    return HttpResponse(request.session.get('auth', False))
+    global test
+    return HttpResponse(processes.get(request.session.get("wallet")).poll())
 
 
 def signup(request):
+    global test_logout
     if request.method == 'POST':
         data = request.POST
 
@@ -41,12 +46,15 @@ def signup(request):
         request.session.set_expiry(0)
 
         #create an agent for the user
+        global test
         user_agent = agent(user=u, seed=seed, name=name, wallet_name=wallet_name)
         user_agent.save()
+        processes.update({wallet_name:user_agent.start()})
+        
 
         #save the agent process so we can kill it later
-        proc = user_agent.start()
-        processes.update({wallet_name:proc})
+        
+        # processes.update({wallet_name:proc})
 
         #register the agent as active
         # act_agent = active_agent(agent=user_agent, login_date=datetime.datetime.now())
@@ -70,8 +78,27 @@ def org_signup(request):
         u = User.objects.create_user(username=email, password=password, email=email, first_name=first_name, last_name=last_name)
         u.save()
 
-        o = org_profile(user=u, org_name=org_name, org_role=org_role, usr_port=port)
+        o = org_profile(user=u, org_name=org_name, org_role=org_role)
         o.save()
+
+
+        seed = tools.id_to_seed(u.id)
+        name = first_name
+        wallet_name = tools.to_wallet("usr", email)
+
+        #store the user id as a cookie
+        request.session['auth'] = True
+        request.session['wallet'] = wallet_name
+        request.session.set_expiry(0)
+
+        #create an agent for the user
+        user_agent = agent(user=u, seed=seed, name=name, wallet_name=wallet_name)
+        
+
+        #save the agent process so we can kill it later
+        proc = user_agent.start()
+        processes.update({wallet_name:proc})
+
     return HttpResponse("hello from org_signup!")
 
 def signin(request):
@@ -85,37 +112,32 @@ def signin(request):
         ret['login'] = (user is not None)
         request.session['auth'] = (user is not None)
         request.session.set_expiry(0)
-                
+
     return JsonResponse(ret)
 
 def logout(request):
+    global test
     if request.method == 'GET':
         try:
-            pass
-            #remove the authenticaiton cookie
-            #del request.session['auth']
-
-            #get the active agent and kill the process and remove it from running agents
-            agent_obj = agent.objects.get(wallet_name=request.session['wallet'])
-            agent_proc = active_agent.objects.get(agent_id=agent_obj.id)
-            #retrieve the running process from dictionary
-            proc = processes.get(request.session.get('wallet'))
-            proc.terminate()
-            print(processes.get(request.session.get('wallet')))
-            #print(agent_proc.pid)
-            # agent_proc.stop()
-            # agent_proc.delete()
-            #print(agent_proc)
+            proc = processes.get(request.session.get("wallet"))
+            if proc and proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=0.5)
+                    print(f"Exited with return code {proc.returncode}")
+                except subprocess.TimeoutExpired:
+                    msg = "Process did not terminate in time"
+                    print(msg)
+                    raise Exception(msg)
         except KeyError:
             print("key error")
     return HttpResponse('logout successful')
 
 def list_conn(request):
     #find the current running process
-    agent_obj = agent.objects.get(wallet_name=request.session['wallet'])
-    agent_proc = active_agent.objects.get(agent_id=agent_obj.id)
+    agent_proc = tools.get_active_agent(request)
     port = agent_proc.outbound_trans
-    return HttpResponse(requests.get("http://localhost:"+str(port)))
+    return HttpResponse(requests.get("http://localhost:"+str(port)+"/connections"))
 
 def list_org(request):
     return HttpResponse(json.dumps(['Faber']))
