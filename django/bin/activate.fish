@@ -29,7 +29,7 @@ end
 # unset irrelevant variables
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV "/home/wade/ppbc/django/ppbc-venv"
+set -gx VIRTUAL_ENV "/home/wade/ppbc/django"
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/bin" $PATH
@@ -52,8 +52,8 @@ if test -z "$VIRTUAL_ENV_DISABLE_PROMPT"
         set -l old_status $status
 
         # Prompt override?
-        if test -n "(ppbc-venv) "            
-            printf "%s%s" "(ppbc-venv) " (set_color normal)
+        if test -n "(django) "            
+            printf "%s%s" "(django) " (set_color normal)
         else
             # ...Otherwise, prepend env
             set -l _checkbase (basename "$VIRTUAL_ENV")
