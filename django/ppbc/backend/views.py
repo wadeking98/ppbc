@@ -2,13 +2,15 @@ from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import authenticate
 import json
+import requests
 from .models import *
 import datetime
+from .tools import *
+processes = {}
+
 # Create your views here.
 def test(request):
     return HttpResponse(request.session.get('auth', False))
-
-
 
 
 def signup(request):
@@ -29,9 +31,9 @@ def signup(request):
         usr_prof.save()
 
 
-        seed = "00000000000000000000000000000000"
+        seed = tools.id_to_seed(u.id)
         name = first_name
-        wallet_name = 'i_'+email.replace('@', '_').replace('.','_')
+        wallet_name = tools.to_wallet("usr", email)
 
         #store the user id as a cookie
         request.session['auth'] = True
@@ -41,7 +43,10 @@ def signup(request):
         #create an agent for the user
         user_agent = agent(user=u, seed=seed, name=name, wallet_name=wallet_name)
         user_agent.save()
-        user_agent.start()
+
+        #save the agent process so we can kill it later
+        proc = user_agent.start()
+        processes.update({wallet_name:proc})
 
         #register the agent as active
         # act_agent = active_agent(agent=user_agent, login_date=datetime.datetime.now())
@@ -93,7 +98,10 @@ def logout(request):
             #get the active agent and kill the process and remove it from running agents
             agent_obj = agent.objects.get(wallet_name=request.session['wallet'])
             agent_proc = active_agent.objects.get(agent_id=agent_obj.id)
-            os.kill(agent_proc.pid, signal.SIGKILL)
+            #retrieve the running process from dictionary
+            proc = processes.get(request.session.get('wallet'))
+            proc.terminate()
+            print(processes.get(request.session.get('wallet')))
             #print(agent_proc.pid)
             # agent_proc.stop()
             # agent_proc.delete()
@@ -103,7 +111,11 @@ def logout(request):
     return HttpResponse('logout successful')
 
 def list_conn(request):
-    return HttpResponse(json.dumps([{'wallet':'i_wade_king', 'partner_name':'Faber', 'status':'Active', 'type':'OutBound'}]))
+    #find the current running process
+    agent_obj = agent.objects.get(wallet_name=request.session['wallet'])
+    agent_proc = active_agent.objects.get(agent_id=agent_obj.id)
+    port = agent_proc.outbound_trans
+    return HttpResponse(requests.get("http://localhost:"+str(port)))
 
 def list_org(request):
     return HttpResponse(json.dumps(['Faber']))

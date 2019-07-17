@@ -43,7 +43,7 @@
 
 <script>
 // @ is an alias to /src
-import MedicationModal from "@/components/MedicationModal.vue";
+import MedicationModal from "./components/MedicationModal.vue";
 export default {
   name: "Medications",
   data: () => {
@@ -63,7 +63,7 @@ export default {
         )
         .then(
           response => {
-            console.log(response)
+            //console.log(response)
             this.medications = response.body.medicationrequests;
             if (this.medications.length > 0) {
               this.hasMedications = true;
@@ -71,8 +71,9 @@ export default {
           }
         );
     },
+    // eslint-disable-next-line
     openModal(medicationRow) {
-      console.log(medicationRow)
+      //console.log(medicationRow)
     }
   },
 

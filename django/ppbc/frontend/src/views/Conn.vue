@@ -38,7 +38,7 @@
 <script>
 import axios from 'axios'
 import Vue from 'vue'
-import connection from '../components/connection'
+import connection from './components/connection'
 export default {
     components:{
         connection

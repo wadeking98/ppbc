@@ -25,25 +25,18 @@ class agent(models.Model):
     name = models.CharField(max_length=100)
     wallet_name = models.CharField(max_length=150)
 
-    
-
     def start(self):
-        it = None
-        ot = None
-        # allocate a free inbound and outbound socket
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as in_sock:
-            in_sock.bind((socket.gethostname(),0))
-            it = in_sock.getsockname()[1]
-
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as out_sock:
-            out_sock.bind((socket.gethostname(), 0))
-            ot = out_sock.getsockname()[1]
+        #allocate two free ports, one to inbound transport (where the 
+        # agent recives credential offers, etc) and one to outbound transport (
+        # where the api is hosted)
+        it = self.alloc_port()
+        ot = self.alloc_port()
         
         # if ports are successfully allocated, run agent
         if it is not None and ot is not None:
             agent_env = os.environ.copy()
             agent_env["PORTS"] = str(ot)+":"+str(ot)+" "+str(it)+":"+str(it)
-            self.proc = subprocess.Popen([
+            proc = subprocess.Popen([
                 "../../scripts/run_docker",
                 "-it", "http", "0.0.0.0", str(it),
                 "-ot", "http", "--admin", "0.0.0.0", str(ot),
@@ -62,12 +55,30 @@ class agent(models.Model):
                 "--wallet-storage-type", "postgres_storage",
                 "--wallet-storage-config", "{\"url\":\"172.0.0.5:5432\", \"max_connections\":5, \"connection_timeout\":10}",
                 "--wallet-storage-creds", "{\"account\":\"postgres\",\"password\":\"docker\",\"admin_account\":\"postgres\",\"admin_password\":\"docker\"}",
-                "--label", self.name], env=agent_env)
-            pid = self.proc.pid
+                "--label", self.name], env=agent_env, encoding="utf-8",)
+            #grab the process id of the agent
+            pid = proc.pid
+
+            #save active agent to the active_agents table
             agent_proc = active_agent(agent=self, inbound_trans=it, outbound_trans=ot, pid=pid, login_date=datetime.datetime.now())
             agent_proc.save()
+            
+            #return the agent process
+            return proc
+
+        #if port allocation fails return nothing
+        return None
+
+    def alloc_port(self):
+        port = None
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind((socket.gethostname(),0))
+            port = sock.getsockname()[1]
+        return port
+
     
     def stop(self):
+        #TODO this function should kill the running agent process
         pass
 
     def __str__(self):

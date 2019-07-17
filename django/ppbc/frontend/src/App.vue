@@ -56,9 +56,8 @@
   </div>
 </template>
 <script>
-import fancyLine from './components/fancy-line'
+import fancyLine from './views/components/fancy-line'
 import axios from 'axios'
-import Vue from 'vue'
 export default {
   components:{
     fancyLine
@@ -80,10 +79,10 @@ export default {
       axios.defaults.xsrfCookieName = 'csrftoken';
       axios.defaults.xsrfHeaderName = "X-CSRFTOKEN";
       axios.get('http://localhost:8000/api/logout/')
-        .then(function(response){
+        .then(function(){
           vm.redirect('');
       })
-        .catch(function(error){
+        .catch(function(){
 
         });
     },

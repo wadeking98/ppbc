@@ -2,7 +2,7 @@
 
 cd $(dirname $0)
 
-# docker build -t aries-cloudagent-run -f ../docker/Dockerfile.run .. || exit 1
+#docker build -t aries-cloudagent-run -f ../docker/Dockerfile.run .. || exit 1
 
 ARGS=""
 for PORT in $PORTS; do
