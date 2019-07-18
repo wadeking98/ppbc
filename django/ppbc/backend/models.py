@@ -39,6 +39,7 @@ class agent(models.Model):
         if it is not None and ot is not None:
             agent_env = os.environ.copy()
             agent_env["PORTS"] = str(ot)+":"+str(ot)+" "+str(it)+":"+str(it)
+            agent_env["NAME"] = self.wallet_name
             proc = subprocess.Popen([
                 "../../scripts/run_docker",
                 "-it", "http", "0.0.0.0", str(it),
@@ -58,10 +59,10 @@ class agent(models.Model):
                 "--wallet-storage-type", "postgres_storage",
                 "--wallet-storage-config", "{\"url\":\"172.0.0.5:5432\", \"max_connections\":5, \"connection_timeout\":10}",
                 "--wallet-storage-creds", "{\"account\":\"postgres\",\"password\":\"docker\",\"admin_account\":\"postgres\",\"admin_password\":\"docker\"}",
-                "--label", self.name],stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=agent_env, encoding="utf-8",)
+                "--label", self.name], env=agent_env, encoding="utf-8",)
             #grab the process id of the agent
             pid = proc.pid
-
+            
             act_agent = active_agent(agent=self,inbound_trans=it,outbound_trans=ot,pid=pid,login_date=datetime.datetime.now())
             act_agent.save()
             

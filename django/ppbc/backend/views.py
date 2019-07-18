@@ -118,6 +118,7 @@ def signin(request):
 def logout(request):
     global test
     if request.method == 'GET':
+        #kill the shell running the docker container
         try:
             proc = processes.get(request.session.get("wallet"))
             if proc and proc.poll() is None:
@@ -131,6 +132,17 @@ def logout(request):
                     raise Exception(msg)
         except KeyError:
             print("key error")
+            
+        #finally kill the docker container
+        try:
+            proc = subprocess.Popen([
+                "docker", "kill", str(request.session.get("wallet"))
+            ])
+            proc.wait(timeout=2)
+        except:
+            print("cannot kill docker container: "+str(request.session.get("wallet")))
+        finally:
+            proc.terminate()
     return HttpResponse('logout successful')
 
 def list_conn(request):
