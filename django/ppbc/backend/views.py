@@ -96,11 +96,11 @@ def org_signup(request):
         request.session.set_expiry(0)
 
         #create an agent for the user
-        user_agent = agent(user=u, seed=seed, name=name, wallet_name=wallet_name)
-        
+        org_agent = agent(user=u, seed=seed, name=name, wallet_name=wallet_name)
+        org_agent.save()
 
         #save the agent process so we can kill it later
-        proc = user_agent.start()
+        proc = org_agent.start()
         processes.update({wallet_name:proc})
 
     return HttpResponse("hello from org_signup!")
@@ -165,10 +165,16 @@ def list_conn(request):
     return HttpResponse(requests.get("http://localhost:"+str(port)+"/connections"))
 
 def list_org(request):
-    return HttpResponse(json.dumps(['Faber']))
+    #list all organizations
+    org_ids = list(org_profile.objects.values_list('user', flat=True))
+    orgs = [User.objects.get(id=org_id).__str__() for org_id in org_ids]
+    return HttpResponse(json.dumps(orgs))
 
 def list_usr(request):
-    return HttpResponse(json.dumps(['Wade']))
+    #list all users
+    usr_ids = list(user_profile.objects.values_list('user', flat=True))
+    usrs = [User.objects.get(id=usr_id).__str__() for usr_id in usr_ids]
+    return HttpResponse(json.dumps(usrs))
 
 def wallet(request):
     return JsonResponse({'wallet':request.session['wallet']})
