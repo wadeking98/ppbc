@@ -27,29 +27,33 @@ def signup(request):
         email = data.get('email')
         password = data.get('password1')
 
-        #create a user object
-        u = User.objects.create_user(username=email, password=password, email=email, first_name=first_name, last_name=last_name)
-        u.save()
+        # create user if not already created
+        try:
+            #create a user object
+            u = User.objects.create_user(username=email, password=password, email=email, first_name=first_name, last_name=last_name)
+            u.save()
 
-        #link additional data to user profile
-        usr_prof = user_profile(user=u, health_id='1234')
-        usr_prof.save()
+            #link additional data to user profile
+            usr_prof = user_profile(user=u, health_id='1234')
+            usr_prof.save()
 
 
-        seed = tools.id_to_seed(u.id)
-        name = first_name
-        wallet_name = tools.to_wallet("usr", email)
+            seed = tools.id_to_seed(u.id)
+            name = first_name
+            wallet_name = tools.to_wallet("usr", email)
 
-        #store the user id as a cookie
-        request.session['auth'] = True
-        request.session['wallet'] = wallet_name
-        request.session.set_expiry(0)
+            #store the user id as a cookie
+            request.session['auth'] = True
+            request.session['wallet'] = wallet_name
+            request.session.set_expiry(0)
 
-        #create an agent for the user
-        global test
-        user_agent = agent(user=u, seed=seed, name=name, wallet_name=wallet_name)
-        user_agent.save()
-        processes.update({wallet_name:user_agent.start()})
+            #create an agent for the user
+            global test
+            user_agent = agent(user=u, seed=seed, name=name, wallet_name=wallet_name)
+            user_agent.save()
+            processes.update({wallet_name:user_agent.start()})
+        except:
+            return JsonResponse({"signup":False})
         
 
         #save the agent process so we can kill it later
@@ -102,6 +106,7 @@ def org_signup(request):
     return HttpResponse("hello from org_signup!")
 
 def signin(request):
+    # test
     if request.method == 'POST':
         ret = {}
         data = request.POST
@@ -113,6 +118,11 @@ def signin(request):
         request.session['auth'] = (user is not None)
         request.session.set_expiry(0)
 
+        # TODO error checking (see if agent is already running)
+        #get the agent and start it
+        agent_obj = tools.get_agent(request)
+        proc = agent_obj.start()
+        processes.update({agent_obj.wallet_name:proc})
     return JsonResponse(ret)
 
 def logout(request):
@@ -132,7 +142,7 @@ def logout(request):
                     raise Exception(msg)
         except KeyError:
             print("key error")
-            
+
         #finally kill the docker container
         try:
             proc = subprocess.Popen([
@@ -143,6 +153,9 @@ def logout(request):
             print("cannot kill docker container: "+str(request.session.get("wallet")))
         finally:
             proc.terminate()
+        
+        #remove this agent from the active agent table
+        tools.get_active_agent(request).delete()
     return HttpResponse('logout successful')
 
 def list_conn(request):

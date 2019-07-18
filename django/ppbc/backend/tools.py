@@ -15,8 +15,13 @@ class tools:
         prefix = "o_" if type=="org" else "i_"
         return prefix+email.replace('@', '_').replace('.','_')
 
+    def get_agent(request):
+        return agent.objects.get(wallet_name=request.session["wallet"])
+
     def get_active_agent(request):
-        agent_obj = agent.objects.get(wallet_name=request.session['wallet'])
+        agent_obj = tools.get_agent(request)
         return active_agent.objects.get(agent_id=agent_obj.id)
+
+    
 
 
