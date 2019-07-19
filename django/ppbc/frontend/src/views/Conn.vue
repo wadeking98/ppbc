@@ -58,7 +58,7 @@ export default {
             var vm = this;
             axios.get('http://localhost:8000/api/list_conn/')
             .then(function(response){
-                vm.conenctions = response.data;
+                vm.conenctions = response.data.results;
                 console.log(vm.conenctions);
             })
         },

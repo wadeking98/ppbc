@@ -1,4 +1,4 @@
-from .models import *
+import subprocess
 class tools:
     def id_to_seed(id):
         """
@@ -15,12 +15,31 @@ class tools:
         prefix = "o_" if type=="org" else "i_"
         return prefix+email.replace('@', '_').replace('.','_')
 
-    def get_agent(request):
-        return agent.objects.get(wallet_name=request.session["wallet"])
 
-    def get_active_agent(request):
-        agent_obj = tools.get_agent(request)
-        return active_agent.objects.get(agent_id=agent_obj.id)
+    def agent_running(wallet):
+        wallet = wallet.strip("\n")
+        ret = False
+        proc = subprocess.Popen([
+                "docker",
+                "ps",
+                "-f",
+                "name="+wallet,
+        ], stdout=subprocess.PIPE, encoding="utf-8")
+        grep = subprocess.Popen([
+            "grep",
+            "-o",
+            wallet
+        ], stdin=proc.stdout, stdout=subprocess.PIPE, encoding="utf-8")
+        try:
+            out, err = grep.communicate(timeout=5)
+            out = out.strip("\n")
+            ret = (out==wallet)
+            print((out, wallet))
+        except:
+            print("an unexpected error ocurred")
+        finally:
+            proc.kill()
+            return ret
 
     
 

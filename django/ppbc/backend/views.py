@@ -6,16 +6,13 @@ import requests
 from .models import *
 import datetime
 from .tools import *
-import pickle
 processes = {}
 test_logout = None
 test = None
 
 # Create your views here.
 def test(request):
-    global test
-    return HttpResponse(processes.get(request.session.get("wallet")).poll())
-
+    return HttpResponse(tools.agent_running(request.session.get("wallet")))
 
 def signup(request):
     global test_logout
@@ -75,33 +72,35 @@ def org_signup(request):
         last_name = data.get('last_name')
         email = data.get('email')
         password = data.get('password1')
-        port = 1234
         org_name = data.get('org_name')
         org_role = data.get('org_role_name')
 
-        u = User.objects.create_user(username=email, password=password, email=email, first_name=first_name, last_name=last_name)
-        u.save()
+        try:
+            u = User.objects.create_user(username=email, password=password, email=email, first_name=first_name, last_name=last_name)
+            u.save()
 
-        o = org_profile(user=u, org_name=org_name, org_role=org_role)
-        o.save()
+            o = org_profile(user=u, org_name=org_name, org_role=org_role)
+            o.save()
 
 
-        seed = tools.id_to_seed(u.id)
-        name = first_name
-        wallet_name = tools.to_wallet("usr", email)
+            seed = tools.id_to_seed(u.id)
+            name = first_name
+            wallet_name = tools.to_wallet("usr", email)
 
-        #store the user id as a cookie
-        request.session['auth'] = True
-        request.session['wallet'] = wallet_name
-        request.session.set_expiry(0)
+            #store the user id as a cookie
+            request.session['auth'] = True
+            request.session['wallet'] = wallet_name
+            request.session.set_expiry(0)
 
-        #create an agent for the user
-        org_agent = agent(user=u, seed=seed, name=name, wallet_name=wallet_name)
-        org_agent.save()
+            #create an agent for the user
+            org_agent = agent(user=u, seed=seed, name=name, wallet_name=wallet_name)
+            org_agent.save()
 
-        #save the agent process so we can kill it later
-        proc = org_agent.start()
-        processes.update({wallet_name:proc})
+            #save the agent process so we can kill it later
+            proc = org_agent.start()
+            processes.update({wallet_name:proc})
+        except:
+            return JsonResponse({"signup":False})
 
     return HttpResponse("hello from org_signup!")
 
@@ -120,7 +119,7 @@ def signin(request):
 
         # TODO error checking (see if agent is already running)
         #get the agent and start it
-        agent_obj = tools.get_agent(request)
+        agent_obj = get_agent(request)
         proc = agent_obj.start()
         processes.update({agent_obj.wallet_name:proc})
     return JsonResponse(ret)
@@ -128,39 +127,29 @@ def signin(request):
 def logout(request):
     global test
     if request.method == 'GET':
-        #kill the shell running the docker container
-        try:
-            proc = processes.get(request.session.get("wallet"))
-            if proc and proc.poll() is None:
-                proc.terminate()
-                try:
-                    proc.wait(timeout=0.5)
-                    print(f"Exited with return code {proc.returncode}")
-                except subprocess.TimeoutExpired:
-                    msg = "Process did not terminate in time"
-                    print(msg)
-                    raise Exception(msg)
-        except KeyError:
-            print("key error")
+        # #kill the shell running the docker container
+        # try:
+        #     proc = processes.get(request.session.get("wallet"))
+        #     if proc and proc.poll() is None:
+        #         proc.terminate()
+        #         try:
+        #             proc.wait(timeout=0.5)
+        #             print(f"Exited with return code {proc.returncode}")
+        #         except subprocess.TimeoutExpired:
+        #             msg = "Process did not terminate in time"
+        #             print(msg)
+        #             raise Exception(msg)
+        # except KeyError:
+        #     print("key error")
 
         #finally kill the docker container
-        try:
-            proc = subprocess.Popen([
-                "docker", "kill", str(request.session.get("wallet"))
-            ])
-            proc.wait(timeout=2)
-        except:
-            print("cannot kill docker container: "+str(request.session.get("wallet")))
-        finally:
-            proc.terminate()
-        
-        #remove this agent from the active agent table
-        tools.get_active_agent(request).delete()
+        agent = get_agent(request)
+        agent.stop()
     return HttpResponse('logout successful')
 
 def list_conn(request):
     #find the current running process
-    agent_proc = tools.get_active_agent(request)
+    agent_proc = get_active_agent(request)
     port = agent_proc.outbound_trans
     return HttpResponse(requests.get("http://localhost:"+str(port)+"/connections"))
 
@@ -181,3 +170,11 @@ def wallet(request):
 
 def conn(request):
     return HttpResponse("hello from conn!")
+
+
+def get_agent(request):
+    return agent.objects.get(wallet_name=request.session["wallet"])
+
+def get_active_agent(request):
+    agent_obj = get_agent(request)
+    return active_agent.objects.get(agent_id=agent_obj.id)
