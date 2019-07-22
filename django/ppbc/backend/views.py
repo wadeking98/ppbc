@@ -6,21 +6,23 @@ import requests
 from .models import *
 import datetime
 from .tools import *
-from walrus import *
-processes = {}
-test_logout = None
-test = None
 
-# initialize the redis  database that we'll use to store the locks and 
-# semaphores
-db = Database(host='localhost', db=0)
-locks = db.Hash('locks')
+
+
 # Create your views here.
 def test(request):
     return HttpResponse(tools.agent_running(request.session.get("wallet")))
 
 def signup(request):
-    global test_logout
+    """
+    handles the signup request from the front end
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    dict: {"signup":True} if signup succeded
+    """
     if request.method == 'POST':
         data = request.POST
 
@@ -50,26 +52,23 @@ def signup(request):
             request.session.set_expiry(0)
 
             #create an agent for the user
-            global test
             user_agent = agent(user=u, seed=seed, name=name, wallet_name=wallet_name)
             user_agent.save()
-            processes.update({wallet_name:agent.start("usr", wallet_name)})
+            agent.start("usr", wallet_name)
         except:
             return JsonResponse({"signup":False})
-        
-
-        #save the agent process so we can kill it later
-        
-        # processes.update({wallet_name:proc})
-
-        #register the agent as active
-        # act_agent = active_agent(agent=user_agent, login_date=datetime.datetime.now())
-        # act_agent.save()
-        # act_agent.start()
-        
-    return HttpResponse(request.POST['first_name'])
+    return JsonResponse({"signup":True})
 
 def org_signup(request):
+    """
+    handles the sign up request from the front end for organizations
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    dict: {"signup":True} if signup succeeded
+    """
     if request.method == 'POST':
         data = request.POST
 
@@ -102,15 +101,22 @@ def org_signup(request):
             org_agent.save()
 
             #save the agent process so we can kill it later
-            proc = agent.start("usr", wallet_name)
-            processes.update({wallet_name:proc})
+            agent.start("usr", wallet_name)
         except:
             return JsonResponse({"signup":False})
 
-    return HttpResponse("hello from org_signup!")
+    return JsonResponse({"signup":True})
 
 def signin(request):
-    # test
+    """
+    Handles the signup request from the frontend
+    
+    Parameters:
+    request (request object): the request send by the front end
+
+    Returns:
+    dict: {"login":True} if login succeedes
+    """
     if request.method == 'POST':
         ret = {}
         data = request.POST
@@ -126,52 +132,80 @@ def signin(request):
         #get the agent and start it
         agent_obj = agent.objects.get(user=user)
         request.session["wallet"] = agent_obj.wallet_name
-        proc = agent.start("usr", agent_obj.wallet_name)
-        processes.update({agent_obj.wallet_name:proc})
+        agent.start("usr", agent_obj.wallet_name)
     return JsonResponse(ret)
 
 def logout(request):
-    global test
-    if request.method == 'GET':
-        # #kill the shell running the docker container
-        # try:
-        #     proc = processes.get(request.session.get("wallet"))
-        #     if proc and proc.poll() is None:
-        #         proc.terminate()
-        #         try:
-        #             proc.wait(timeout=0.5)
-        #             print(f"Exited with return code {proc.returncode}")
-        #         except subprocess.TimeoutExpired:
-        #             msg = "Process did not terminate in time"
-        #             print(msg)
-        #             raise Exception(msg)
-        # except KeyError:
-        #     print("key error")
+    """
+    handles the logout request from the front end and 
+    kills the running agent
 
-        #finally kill the docker container
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    dict: {"logut":True} if signup succeded
+    """
+    if request.method == 'GET':
         agent.kill("usr",request.session["wallet"])
         del request.session["wallet"]
-    return HttpResponse('logout successful')
+    return JsonResponse({"logout":True})
 
 def list_conn(request):
+    """
+    lists all the connections for the current user
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    dict: JSON array of all the user connections
+    """
     #find the current running process
     agent_proc = get_active_agent(request)
     port = agent_proc.outbound_trans
     return HttpResponse(requests.get("http://localhost:"+str(port)+"/connections"))
 
 def list_org(request):
+    """
+    lists all the organizations in the database
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    dict: JSON array of all organizations in the database
+    """
     #list all organizations
     org_ids = list(org_profile.objects.values_list('user', flat=True))
     orgs = [User.objects.get(id=org_id).__str__() for org_id in org_ids]
     return HttpResponse(json.dumps(orgs))
 
 def list_usr(request):
+    """
+    lists all the users in the database
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    dict: JSON array of all users in the database
+    """
     #list all users
     usr_ids = list(user_profile.objects.values_list('user', flat=True))
     usrs = [User.objects.get(id=usr_id).__str__() for usr_id in usr_ids]
     return HttpResponse(json.dumps(usrs))
 
 def wallet(request):
+    """
+    returns the wallet name of the current user
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    dict: JSON object containing the wallet name
+    """
     return JsonResponse({'wallet':request.session['wallet']})
 
 def conn(request):

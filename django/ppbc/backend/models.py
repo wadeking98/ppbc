@@ -39,6 +39,14 @@ class agent(models.Model):
 
     @classmethod
     def start(cls, agent_type, wallet_name):
+        """
+        atomically marks agent as allocated to the server or to a user,
+        and starts an aries agent instance
+
+        Parameters:
+        agent_type (str): either "usr" for user or "srv" for server
+        wallet_name (str): the wallet name of the agent to start
+        """
         with transaction.atomic():
             agent_obj = (cls.objects.select_for_update().get(wallet_name=wallet_name))
             agent_obj.user_allocated = (agent_obj.user_allocated or (agent_type=="usr"))
@@ -49,6 +57,14 @@ class agent(models.Model):
 
     @classmethod
     def kill(cls, agent_type, wallet_name):
+        """
+        atomically marks agent as unallocated to either the server 
+        or to a user, and kills the aries agent instance
+
+        Parameters:
+        agent_type (str): either "usr" for user or "srv" for server
+        wallet_name (str): the wallet name of the agent to start
+        """
         with transaction.atomic():
             agent_obj = (cls.objects.select_for_update().get(wallet_name=wallet_name))
             #if the user is allocated and we're killing a user, set user_allocated to false
@@ -64,13 +80,24 @@ class agent(models.Model):
 
     
     def alloc_port(self):
+        """
+        binds a random free port on the machine and returns the port
+        number
+
+        Returns:
+        int: the free allocated port
+        """
         port = None
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.bind((socket.gethostname(),0))
             port = sock.getsockname()[1]
         return port
 
+
     def find_or_create(self):
+        """
+        creates the aries agent unless it's already running
+        """
         if not tools.agent_running(self.wallet_name):
             print("got here2")
             #allocate two free ports, one to inbound transport (where the 
@@ -110,15 +137,13 @@ class agent(models.Model):
                 act_agent = active_agent(agent=self,inbound_trans=it,outbound_trans=ot,pid=pid,login_date=datetime.datetime.now())
                 act_agent.save()
                 
-                #return the agent process
-                return proc
-
-            #if port allocation fails return nothing
-            return None
-        else:
-            return None
+                
     
     def stop(self):
+        """
+        starts a subprocess to kill the running docker container and
+        remove the agent from the active_agents table
+        """
         if tools.agent_running(self.wallet_name):
             try:
                 proc = subprocess.Popen([
@@ -133,25 +158,6 @@ class agent(models.Model):
             #remove this agent from the active agent table
             active_agent.objects.get(agent=self).delete()
         
-    
-    def server_stop(self):
-        sem_success = self.sem.acquire(blocking=False)
-        if sem_success:
-            if tools.agent_running(self.wallet_name):
-                try:
-                    proc = subprocess.Popen([
-                        "docker", "kill", self.wallet_name
-                    ])
-                    proc.wait(timeout=2)
-                except:
-                    print("cannot kill docker container: "+str(request.session.get("wallet")))
-                finally:
-                    proc.terminate()
-                
-                #remove this agent from the active agent table
-                active_agent.objects.get(agent=self).delete()
-            self.sem.release()
-        self.sem.release()
 
     def __str__(self):
         return self.user.__str__()
