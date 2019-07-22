@@ -6,10 +6,15 @@ import requests
 from .models import *
 import datetime
 from .tools import *
+from walrus import *
 processes = {}
 test_logout = None
 test = None
 
+# initialize the redis  database that we'll use to store the locks and 
+# semaphores
+db = Database(host='localhost', db=0)
+locks = db.Hash('locks')
 # Create your views here.
 def test(request):
     return HttpResponse(tools.agent_running(request.session.get("wallet")))
@@ -48,7 +53,7 @@ def signup(request):
             global test
             user_agent = agent(user=u, seed=seed, name=name, wallet_name=wallet_name)
             user_agent.save()
-            processes.update({wallet_name:user_agent.start()})
+            processes.update({wallet_name:agent.start("usr", wallet_name)})
         except:
             return JsonResponse({"signup":False})
         
@@ -97,7 +102,7 @@ def org_signup(request):
             org_agent.save()
 
             #save the agent process so we can kill it later
-            proc = org_agent.start()
+            proc = agent.start("usr", wallet_name)
             processes.update({wallet_name:proc})
         except:
             return JsonResponse({"signup":False})
@@ -119,8 +124,9 @@ def signin(request):
 
         # TODO error checking (see if agent is already running)
         #get the agent and start it
-        agent_obj = get_agent(request)
-        proc = agent_obj.start()
+        agent_obj = agent.objects.get(user=user)
+        request.session["wallet"] = agent_obj.wallet_name
+        proc = agent.start("usr", agent_obj.wallet_name)
         processes.update({agent_obj.wallet_name:proc})
     return JsonResponse(ret)
 
@@ -143,8 +149,8 @@ def logout(request):
         #     print("key error")
 
         #finally kill the docker container
-        agent = get_agent(request)
-        agent.stop()
+        agent.kill("usr",request.session["wallet"])
+        del request.session["wallet"]
     return HttpResponse('logout successful')
 
 def list_conn(request):

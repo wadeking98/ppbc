@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django import forms
+from django.core.validators import MaxValueValidator
+from django.db import transaction
 import subprocess
 import os, signal
 import socket
@@ -27,18 +29,40 @@ class agent(models.Model):
     seed = models.CharField(max_length=32)
     name = models.CharField(max_length=100)
     wallet_name = models.CharField(max_length=150)
+    user_allocated = models.BooleanField(default=False)
+    server_allocated = models.BooleanField(default=False)
     
     def __init__(self, *args, **kwargs):
         self.sem = Semaphore(value=2)
         self.create = Lock()
         super(agent, self).__init__(*args, **kwargs)
 
-    def start(self):
-        self.sem.acquire()
-        self.create.acquire()
-        proc = self.find_or_create()
-        self.create.release()
+    @classmethod
+    def start(cls, agent_type, wallet_name):
+        with transaction.atomic():
+            agent_obj = (cls.objects.select_for_update().get(wallet_name=wallet_name))
+            agent_obj.user_allocated = (agent_obj.user_allocated or (agent_type=="usr"))
+            agent_obj.server_allocated = (agent_obj.server_allocated or(agent_type=="srv"))
+            agent_obj.find_or_create()
+            agent_obj.save()
 
+
+    @classmethod
+    def kill(cls, agent_type, wallet_name):
+        with transaction.atomic():
+            agent_obj = (cls.objects.select_for_update().get(wallet_name=wallet_name))
+            #if the user is allocated and we're killing a user, set user_allocated to false
+            #likewise for server
+            agent_obj.user_allocated = (agent_obj.user_allocated and (agent_type!="usr"))
+            agent_obj.server_allocated = (agent_obj.server_allocated and (agent_type!="srv"))
+            
+            # kill the agent if it's not in use
+            if not agent_obj.user_allocated and not agent_obj.server_allocated:
+                agent_obj.stop()
+            agent_obj.save()   
+        
+
+    
     def alloc_port(self):
         port = None
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -95,7 +119,6 @@ class agent(models.Model):
             return None
     
     def stop(self):
-        self.sem.acquire()
         if tools.agent_running(self.wallet_name):
             try:
                 proc = subprocess.Popen([
@@ -109,7 +132,25 @@ class agent(models.Model):
             
             #remove this agent from the active agent table
             active_agent.objects.get(agent=self).delete()
-        self.sem.release()
+        
+    
+    def server_stop(self):
+        sem_success = self.sem.acquire(blocking=False)
+        if sem_success:
+            if tools.agent_running(self.wallet_name):
+                try:
+                    proc = subprocess.Popen([
+                        "docker", "kill", self.wallet_name
+                    ])
+                    proc.wait(timeout=2)
+                except:
+                    print("cannot kill docker container: "+str(request.session.get("wallet")))
+                finally:
+                    proc.terminate()
+                
+                #remove this agent from the active agent table
+                active_agent.objects.get(agent=self).delete()
+            self.sem.release()
         self.sem.release()
 
     def __str__(self):
