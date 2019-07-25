@@ -130,7 +130,7 @@ export default {
                 .then(function (response) {
                     //stop loading icon and redirect to home
                     vm.loading = false;
-                    vm.redirect('signin');
+                    vm.redirect('home');
                 })
                 .catch(function (error) {
                     //currentObj.output = error;

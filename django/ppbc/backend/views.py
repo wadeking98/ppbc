@@ -9,6 +9,7 @@ from .tools import *
 
 
 
+
 # Create your views here.
 def test(request):
     return HttpResponse(tools.agent_running(request.session.get("wallet")))
@@ -178,7 +179,7 @@ def list_org(request):
     """
     #list all organizations
     org_ids = list(org_profile.objects.values_list('user', flat=True))
-    orgs = [User.objects.get(id=org_id).__str__() for org_id in org_ids]
+    orgs = [[org_id,User.objects.get(id=org_id).__str__()] for org_id in org_ids]
     return HttpResponse(json.dumps(orgs))
 
 def list_usr(request):
@@ -193,7 +194,7 @@ def list_usr(request):
     """
     #list all users
     usr_ids = list(user_profile.objects.values_list('user', flat=True))
-    usrs = [User.objects.get(id=usr_id).__str__() for usr_id in usr_ids]
+    usrs = [[usr_id,User.objects.get(id=usr_id).__str__()] for usr_id in usr_ids]
     return HttpResponse(json.dumps(usrs))
 
 def wallet(request):
@@ -207,6 +208,69 @@ def wallet(request):
     dict: JSON object containing the wallet name
     """
     return JsonResponse({'wallet':request.session['wallet']})
+
+def get_invite(request):
+    agent_proc = get_active_agent(request)
+    port = agent_proc.outbound_trans
+    return requests.post("http://localhost:"+str(port)+"/connections/create-invitation").json()
+
+
+def del_conn(request):
+    if request.method == 'POST':
+        data = request.POST
+        conn_id = data.get('conn_id')
+        agent_proc = get_active_agent(request)
+        port = agent_proc.outbound_trans
+        requests.post("http://localhost:"+str(port)+"/connections/"+str(conn_id)+"/remove")
+        return HttpResponse("hello")
+
+
+def send_msg(request):
+    if request.method == 'POST':
+        data = request.POST
+        conn_id = data.get('conn_id')
+        msg = {"content":str(data.get('msg'))}
+        agent_proc = get_active_agent(request)
+        port = agent_proc.outbound_trans
+        requests.post("http://localhost:"+str(port)+"/connections/"+str(conn_id)+"/send-message", data=json.dumps(msg))
+        return HttpResponse("hello")
+
+
+def send_invite(request):
+    if request.method == 'POST':
+        #get the post data
+        data = request.POST
+        usr_id = data.get('user')
+
+        #find the agent recieving the connection
+        usr = User.objects.get(id=usr_id)
+        agent_obj = agent.objects.get(user=usr)
+        wallet = agent_obj.wallet_name
+
+        #mark this agent as allocated to the server
+        agent.start(agent_type="srv", wallet_name=request.session.get('wallet'))
+        #start or find the running aries agent
+        agent.start(agent_type="srv", wallet_name=wallet)
+        act_agent_obj = active_agent.objects.get(agent=agent_obj)
+        port = act_agent_obj.outbound_trans
+
+        #get the invitation json
+        invite = get_invite(request)
+        print(invite.get('invitation'))
+
+        #wait for the aries agent to come online and send invitation
+        response = agent.try_post(url="http://localhost:"+str(port)+"/connections/receive-invitation",data=json.dumps(invite.get('invitation')))
+        conn_id = response.json().get('connection_id')
+        # TODO wait until connection is active before killing server-agent process
+        agent.wait_until_conn(url="http://localhost:"+str(port)+"/connections", conn_id=conn_id)
+
+        #finally kill the agent unless it's allocated to a user
+        agent.kill(agent_type="srv", wallet_name=request.session.get('wallet'))
+        agent.kill(agent_type="srv", wallet_name=wallet)
+        return HttpResponse(response)
+    return HttpResponse("wrong method")
+        
+
 
 def conn(request):
     return HttpResponse("hello from conn!")

@@ -11,10 +11,10 @@
                 <option :value="null" disabled selected="selected">--Please Select a Partner--</option>
                 
                 <optgroup label="Organizations">
-                    <option :value="org" v-for="org in orgs" v-bind:key="org">{{ org }}</option>
+                    <option :value="org[0]" v-for="org in orgs" v-bind:key="org[0]">{{ org[1] }}</option>
                 </optgroup>
                 <optgroup label="Users">
-                    <option :value="usr" v-for="usr in users" v-bind:key="usr">{{ usr }}</option>
+                    <option :value="usr[0]" v-for="usr in users" v-bind:key="usr[0]">{{ usr[1] }}</option>
                 </optgroup>
 
             </b-form-select>
@@ -26,10 +26,11 @@
         <connection 
         v-for="conn in conenctions" 
         v-bind:wallet="conn.wallet" 
-        v-bind:partner="conn.partner_name"
-        v-bind:status="conn.status" 
-        v-bind:type="conn.type"
+        v-bind:partner="conn.their_label"
+        v-bind:status="conn.state" 
+        v-bind:id="conn.connection_id"
         v-bind:key="conn.wallet"
+        @refresh="loadConn"
         ></connection>
       
         
@@ -58,7 +59,7 @@ export default {
             var vm = this;
             axios.get('http://localhost:8000/api/list_conn/')
             .then(function(response){
-                vm.conenctions = response.data.results;
+                vm.conenctions = response.data.results.filter(conn => conn.state == "active");
                 console.log(vm.conenctions);
             })
         },
@@ -85,19 +86,15 @@ export default {
 
             axios.defaults.xsrfCookieName = 'csrftoken';
             axios.defaults.xsrfHeaderName = "X-CSRFTOKEN";
-            axios.get('http://localhost:8000/api/wallet')
+            axios.post('http://localhost:8000/api/send_invite/', 'user='+vm.partner)
             .then(function(res){
-                var testStr = 'wallet_name='+res.data.wallet+'&partner_name='+vm.partner
-                axios.post('http://localhost:8000/api/conn/', testStr)
-                .then(function(res){
-                    console.log(res.data);
-                    vm.loading = false;
-                    vm.loadConn()
-                })
-                .catch(function(err){
-
-                });
+                console.log(res.data);
+                vm.loading = false;
+                vm.loadConn()
             })
+            .catch(function(err){
+
+            });
             
         },
 

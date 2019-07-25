@@ -7,8 +7,10 @@ import subprocess
 import os, signal
 import socket
 import datetime
-from threading import Semaphore, Lock
+import time
 from .tools import *
+import nmap
+import requests
 
 
 class user_profile(models.Model):
@@ -32,10 +34,7 @@ class agent(models.Model):
     user_allocated = models.BooleanField(default=False)
     server_allocated = models.BooleanField(default=False)
     
-    def __init__(self, *args, **kwargs):
-        self.sem = Semaphore(value=2)
-        self.create = Lock()
-        super(agent, self).__init__(*args, **kwargs)
+    
 
     @classmethod
     def start(cls, agent_type, wallet_name):
@@ -75,8 +74,56 @@ class agent(models.Model):
             # kill the agent if it's not in use
             if not agent_obj.user_allocated and not agent_obj.server_allocated:
                 agent_obj.stop()
-            agent_obj.save()   
+            agent_obj.save()
+    
+
+    @classmethod
+    def try_post(cls, url, data, max_iter=10):
+        while max_iter > 0:
+            print(max_iter)
+            try:
+                return requests.post(url, data=data)
+            except:
+                time.sleep(1)
+                max_iter -= 1
+
+    # @classmethod
+    # def wait_for_agent_active(cls, port, url, max_iter=5):
+    #     print((port,url))
+    #     state = cls.check_ping(port, url)
+    #     while not state and max_iter>0:
+    #         time.sleep(1)
+    #         state = cls.check_ping(port, url)
+    #         max_iter -= 1
+    #     return state
         
+    # @classmethod
+    # def check_ping(cls, port, url):
+    #     nm = nmap.PortScanner()
+    #     try:
+    #         nm.scan(url, str(port))
+    #         return nm[url]['tcp'][int(port)]['state'] == 'open'
+    #     except:
+    #         return False
+        
+
+    @classmethod
+    def wait_until_conn(cls, url, conn_id,max_iter=10):
+        success = cls.search_conn(url, conn_id)
+        while not success and max_iter > 0:
+            max_iter -= 1
+            time.sleep(1)
+            success = cls.search_conn(url, conn_id)
+
+    @classmethod
+    def search_conn(cls, url, conn_id):
+        conns = requests.get(url).json().get('results')
+        for conn in conns:
+            if conn.get('connection_id') == conn_id:
+                if conn.get('state') == "active":
+                    return True
+        return False
+
 
     
     def alloc_port(self):

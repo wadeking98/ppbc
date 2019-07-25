@@ -1,17 +1,25 @@
 <template>
     <b-card bg-variant="info" text-variant="white">
     <h3>{{ partner }}</h3>
-    <h5>Status: {{ status }}    Type: {{ type }}</h5>
-    <div id="req">
-    <a class = pfReq href="#" v-if='status === "Active"'><h5>Send proof request</h5></a>
-    <a class = pfReq href="#" v-if='type === "Outbound" && status === "Active"'><h5>Send Credential</h5></a>
-    </div>
+    <h5>Status: {{ status }}</h5>
+    <h5>ID: {{ id }}</h5>
+    <router-link :to="{name: 'messages', params:{conn_id:id}}">message</router-link>
+    <b-link @click="removeConn()">remove</b-link>
     </b-card>
 </template>
 <script>
+import axios from 'axios'
 export default {
     name:'connection',
-    props:['wallet', 'partner', 'status', 'type'],
+    props:['wallet', 'partner', 'status', 'id'],
+    methods:{
+        removeConn(){
+            var vm = this
+            axios.post('http://localhost:8000/api/del_conn/', 'conn_id='+vm.id).then(function(){
+                vm.$emit('refresh')
+            })
+        }
+    },
 }
 </script>
 <style>

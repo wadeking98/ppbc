@@ -11,5 +11,8 @@ urlpatterns = [
     path('list_usr/', views.list_usr, name='list_usr'),
     path('wallet/', views.wallet, name='wallet'),
     path('conn/', views.conn, name='conn'),
-    path('logout/', views.logout, name='logout')
+    path('logout/', views.logout, name='logout'),
+    path('send_invite/', views.send_invite, name='send_invite'),
+    path('del_conn/', views.del_conn, name='del_conn'),
+    path('send_msg/', views.send_msg, name='send_msg')
 ]

@@ -33,6 +33,11 @@ export default new Router({
       component: () => import('./views/Conn.vue'),
     },
     {
+      path: '/messages/:conn_id',
+      name: 'messages',
+      component: () => import('./views/Mess.vue'),
+    },
+    {
       path: '/profile',
       name: 'profile',
       // route level code-splitting
