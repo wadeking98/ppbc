@@ -210,12 +210,31 @@ def wallet(request):
     return JsonResponse({'wallet':request.session['wallet']})
 
 def get_invite(request):
+    """
+    NOT AN API SERVICE
+    creates an invitation and returns the invitation json
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    dict: JSON object defining the invitation
+    """
     agent_proc = get_active_agent(request)
     port = agent_proc.outbound_trans
     return requests.post("http://localhost:"+str(port)+"/connections/create-invitation").json()
 
 
 def del_conn(request):
+    """
+    deletes a specified user connection
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    dict: JSON object containing the wallet name
+    """
     if request.method == 'POST':
         data = request.POST
         conn_id = data.get('conn_id')
@@ -226,6 +245,15 @@ def del_conn(request):
 
 
 def send_msg(request):
+    """
+    sends a message to a user
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    HttpResponse: placeholder for now
+    """
     if request.method == 'POST':
         data = request.POST
         conn_id = data.get('conn_id')
@@ -237,6 +265,15 @@ def send_msg(request):
 
 
 def send_invite(request):
+    """
+    automatically connects two users, even if one is offline
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    HttpResponse: the response object fromt he aries agent 
+    """
     if request.method == 'POST':
         #get the post data
         data = request.POST
@@ -271,6 +308,13 @@ def send_invite(request):
     return HttpResponse("wrong method")
         
 
+def register_seed(request):
+    if request.method == 'POST':
+        agent_obj = get_agent(request)
+        seed = agent_obj.seed
+        data = {"alias":None, "did":None, "role":"TRUST_ANCHOR", "seed":str(seed)}
+        return HttpResponse(requests.post("http://localhost:9000/register", json.dumps(data)))
+    return HttpResponse("method not allowed")
 
 def conn(request):
     return HttpResponse("hello from conn!")

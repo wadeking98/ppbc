@@ -44,7 +44,7 @@
                 
 
                 vm.activity = vm.conn_obj
-                .activity.filter(act => act.type == "message").slice().reverse();
+                .activity.filter(act => act.type == "message").slice() .reverse();
             })
 
         },

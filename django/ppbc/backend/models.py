@@ -9,7 +9,6 @@ import socket
 import datetime
 import time
 from .tools import *
-import nmap
 import requests
 
 
@@ -79,6 +78,14 @@ class agent(models.Model):
 
     @classmethod
     def try_post(cls, url, data, max_iter=10):
+        """
+        polling loop, sleeps until post succeeds or max_iter is used
+
+        Parameters:
+        url (str): the url to post to
+        data (str): the data being posted as json
+        max_iter (int): the number of times to try posting before giving up
+        """
         while max_iter > 0:
             print(max_iter)
             try:
@@ -87,28 +94,16 @@ class agent(models.Model):
                 time.sleep(1)
                 max_iter -= 1
 
-    # @classmethod
-    # def wait_for_agent_active(cls, port, url, max_iter=5):
-    #     print((port,url))
-    #     state = cls.check_ping(port, url)
-    #     while not state and max_iter>0:
-    #         time.sleep(1)
-    #         state = cls.check_ping(port, url)
-    #         max_iter -= 1
-    #     return state
-        
-    # @classmethod
-    # def check_ping(cls, port, url):
-    #     nm = nmap.PortScanner()
-    #     try:
-    #         nm.scan(url, str(port))
-    #         return nm[url]['tcp'][int(port)]['state'] == 'open'
-    #     except:
-    #         return False
-        
 
     @classmethod
     def wait_until_conn(cls, url, conn_id,max_iter=10):
+        """
+        polling loop waits until connection becomes active
+
+        Parameters:
+        url (str): the url of where to get the connections
+        conn_id (str): the id of the connection in question
+        """
         success = cls.search_conn(url, conn_id)
         while not success and max_iter > 0:
             max_iter -= 1
@@ -117,6 +112,14 @@ class agent(models.Model):
 
     @classmethod
     def search_conn(cls, url, conn_id):
+        """
+        Parameters:
+        url (str): url location of user connecitons
+        conn_id (str): the id of the conneciton in question
+
+        Returns:
+        bool: True if conneciton is active
+        """
         conns = requests.get(url).json().get('results')
         for conn in conns:
             if conn.get('connection_id') == conn_id:
@@ -146,7 +149,6 @@ class agent(models.Model):
         creates the aries agent unless it's already running
         """
         if not tools.agent_running(self.wallet_name):
-            print("got here2")
             #allocate two free ports, one to inbound transport (where the 
             # agent recives credential offers, etc) and one to outbound transport (
             # where the api is hosted)

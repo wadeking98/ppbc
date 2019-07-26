@@ -38,6 +38,11 @@ export default new Router({
       component: () => import('./views/Mess.vue'),
     },
     {
+      path: '/credentials/:conn_id',
+      name: 'credentials',
+      component: () => import('./views/Cred.vue'),
+    },
+    {
       path: '/profile',
       name: 'profile',
       // route level code-splitting

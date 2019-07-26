@@ -3,8 +3,9 @@
     <h3>{{ partner }}</h3>
     <h5>Status: {{ status }}</h5>
     <h5>ID: {{ id }}</h5>
-    <router-link :to="{name: 'messages', params:{conn_id:id}}">message</router-link>
-    <b-link @click="removeConn()">remove</b-link>
+    <router-link class="options" :to="{name: 'messages', params:{conn_id:id}}">message</router-link>
+    <router-link class="options" :to="{name: 'credentials', params:{conn_id:id}}">credential</router-link>
+    <b-link class="options" @click="removeConn()">remove</b-link>
     </b-card>
 </template>
 <script>
@@ -23,6 +24,9 @@ export default {
 }
 </script>
 <style>
+.options{
+    margin: 1vh;
+}
 </style>
 
 
