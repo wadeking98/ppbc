@@ -20,6 +20,7 @@ from .config.injection_context import InjectionContext
 from .config.logging import LoggingConfigurator
 from .dispatcher import Dispatcher
 from .error import StartupError
+from .ledger.base import BaseLedger
 from .messaging.connections.manager import ConnectionManager, ConnectionManagerError
 from .messaging.connections.models.connection_record import ConnectionRecord
 from .messaging.error import MessageParseError, MessagePrepareError
@@ -138,7 +139,6 @@ class Conductor:
                     "get_connection_target",
                     "fetch_did_document",
                     "find_connection",
-                    "updated_record",
                 ),
             )
 
@@ -165,6 +165,14 @@ class Conductor:
         elif wallet_seed:
             public_did_info = await wallet.create_public_did(seed=wallet_seed)
             public_did = public_did_info.did
+
+        # Publish endpoint if necessary
+        endpoint = context.settings.get("default_endpoint")
+        if public_did:
+            ledger = await context.inject(BaseLedger, required=False)
+            if ledger:
+                async with ledger:
+                    await ledger.update_endpoint_for_did(public_did, endpoint)
 
         # Start up transports
         try:
@@ -214,17 +222,7 @@ class Conductor:
                 print("Invitation URL:")
                 print(invite_url)
             except Exception:
-                self.logger.exception("Error sending invitation")
-
-        # Auto-send an invitation to another agent
-        send_invite_to = context.settings.get("debug.send_invitation_to")
-        if send_invite_to:
-            try:
-                mgr = ConnectionManager(self.context)
-                _connection, invitation = await mgr.create_invitation()
-                await mgr.send_invitation(invitation, send_invite_to)
-            except Exception:
-                self.logger.exception("Error sending invitation")
+                self.logger.exception("Error creating invitation")
 
     async def stop(self, timeout=0.1):
         """Stop the agent."""
