@@ -55,6 +55,7 @@ def signup(request):
             #create an agent for the user
             user_agent = agent(user=u, seed=seed, name=name, wallet_name=wallet_name)
             user_agent.save()
+            register_seed(request)
             agent.start("usr", wallet_name)
         except:
             return JsonResponse({"signup":False})
@@ -102,6 +103,7 @@ def org_signup(request):
             org_agent.save()
 
             #save the agent process so we can kill it later
+            register_seed(request)
             agent.start("usr", wallet_name)
         except:
             return JsonResponse({"signup":False})
@@ -133,6 +135,7 @@ def signin(request):
         #get the agent and start it
         agent_obj = agent.objects.get(user=user)
         request.session["wallet"] = agent_obj.wallet_name
+        register_seed(request)
         agent.start("usr", agent_obj.wallet_name)
     return JsonResponse(ret)
 
