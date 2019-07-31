@@ -319,6 +319,36 @@ def register_seed(request):
         return HttpResponse(requests.post("http://localhost:9000/register", json.dumps(data)))
     return HttpResponse("method not allowed")
 
+def issue_cred(request):
+    if request.method == 'POST':
+        data = request.POST
+        clean_data = {key:val[0] for key,val in dict(data).items()}
+        act_agent = get_active_agent(request)
+
+        #push schema to the ledger
+        schema_resp = requests.post(
+            url="http://localhost:"+str(act_agent.outbound_trans)+"/schemas",
+            data=json.dumps({
+                "attributes":list(clean_data.keys()), 
+                "schema_name":str(clean_data.get("type",None))+"_"+act_agent.agent.name,
+                "schema_version":"1.0"
+            })
+        )
+
+        schema_id = json.loads(schema_resp.text).get("schema_id", None)
+        
+
+        #push credential defenition to the ledger
+        credef_resp = requests.post(
+            url="http://localhost:"+str(act_agent.outbound_trans)+"/credential-definitions",
+            data=json.dumps({"schema_id":str(schema_id)})
+        )
+
+        credef_id = json.loads(credef_resp.text).get("credential_definition_id", None)
+        print(credef_id)
+        
+    return HttpResponse("hello")
+
 def conn(request):
     return HttpResponse("hello from conn!")
 

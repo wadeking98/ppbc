@@ -10,6 +10,7 @@ import datetime
 import time
 from .tools import *
 import requests
+import json
 
 
 class user_profile(models.Model):
@@ -50,7 +51,23 @@ class agent(models.Model):
             agent_obj.user_allocated = (agent_obj.user_allocated or (agent_type=="usr"))
             agent_obj.server_allocated = (agent_obj.server_allocated or(agent_type=="srv"))
             agent_obj.find_or_create()
+            #start the routing agent if it has not already started
+            agent.start_router()
             agent_obj.save()
+
+    
+    @classmethod
+    def start_router(cls):
+        router_usr = User.objects.filter(email="router@mail.com").first()
+        if router_usr is None:
+            router_usr = User.objects.create_user(username="router", password="1234", email="router@mail.com")
+            router_usr.save()
+
+        router_agent = agent.objects.filter(wallet_name="i_router_mail_com").first()
+        if router_agent is None:
+            router_agent = agent(user=router_usr, seed=tools.id_to_seed(router_usr.id),name="router",wallet_name="i_router_mail_com")
+            router_agent.save()
+        router_agent.find_or_create(router=True)
 
 
     @classmethod
@@ -144,16 +161,22 @@ class agent(models.Model):
         return port
 
 
-    def find_or_create(self):
+    def find_or_create(self, router=False):
         """
         creates the aries agent unless it's already running
         """
         if not tools.agent_running(self.wallet_name):
+            data = {"alias":None, "did":None, "role":"TRUST_ANCHOR", "seed":str(self.seed)}
+            requests.post("http://localhost:9000/register", json.dumps(data))
             #allocate two free ports, one to inbound transport (where the 
             # agent recives credential offers, etc) and one to outbound transport (
             # where the api is hosted)
-            it = self.alloc_port()
-            ot = self.alloc_port()
+            it = 10000
+            ot = 5000
+
+            if not router:
+                it = self.alloc_port()
+                ot = self.alloc_port()
             
             # if ports are successfully allocated, run agent
             if it is not None and ot is not None:
