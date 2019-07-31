@@ -23,7 +23,6 @@ class IndyWallet(BaseWallet):
     DEFAULT_KEY = ""
     DEFAULT_NAME = "default"
     DEFAULT_STORAGE_TYPE = None
-    WALLET_TYPE = "indy"
 
     def __init__(self, config: dict = None):
         """
@@ -41,7 +40,6 @@ class IndyWallet(BaseWallet):
         super(IndyWallet, self).__init__(config)
         self._auto_create = config.get("auto_create", True)
         self._auto_remove = config.get("auto_remove", False)
-        self._created = False
         self._freshness_time = config.get("freshness_time", False)
         self._handle = None
         self._key = config.get("key") or self.DEFAULT_KEY
@@ -61,11 +59,6 @@ class IndyWallet(BaseWallet):
 
         """
         return self._handle
-
-    @property
-    def created(self) -> bool:
-        """Check whether the wallet was created on the last open call."""
-        return self._created
 
     @property
     def opened(self) -> bool:
@@ -202,7 +195,7 @@ class IndyWallet(BaseWallet):
         if self.opened:
             return
 
-        self._created = False
+        created = False
         while True:
             try:
                 self._handle = await indy.wallet.open_wallet(
@@ -212,13 +205,12 @@ class IndyWallet(BaseWallet):
                 break
             except IndyError as x_indy:
                 if x_indy.error_code == ErrorCode.WalletNotFoundError:
-                    if self._created:
+                    if created:
                         raise WalletError(
                             "Wallet not found after creation: {}".format(self.name)
                         )
                     if self._auto_create:
                         await self.create(self._auto_remove)
-                        self._created = True
                     else:
                         raise WalletNotFoundError(
                             "Wallet not found: {}".format(self.name)

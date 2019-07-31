@@ -14,7 +14,7 @@ class RouteQueryResponseHandler(BaseHandler):
         )
         assert isinstance(context.message, RouteQueryResponse)
 
-        if not context.connection_ready:
+        if not context.connection_active:
             raise HandlerException(
                 "Cannot handle route query response: no active connection"
             )

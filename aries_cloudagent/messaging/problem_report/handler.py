@@ -1,6 +1,6 @@
 """Generic problem report handler."""
 
-from ..base_handler import BaseHandler, BaseResponder, RequestContext
+from ...base_handler import BaseHandler, BaseResponder, RequestContext
 
 from .message import ProblemReport
 
@@ -25,5 +25,3 @@ class ProblemReportHandler(BaseHandler):
             context.message_delivery.sender_did,
             context.message,
         )
-
-        await responder.send_webhook("problem-report", context.message.serialize())

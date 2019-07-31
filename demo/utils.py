@@ -1,14 +1,12 @@
 import functools
 import json
 import os
-import sys
 from timeit import default_timer
 
 import prompt_toolkit
 from prompt_toolkit.application import run_in_terminal
 from prompt_toolkit.eventloop.defaults import use_asyncio_event_loop
 from prompt_toolkit.patch_stdout import patch_stdout
-from prompt_toolkit.shortcuts import ProgressBar
 
 import pygments
 from pygments.filter import Filter
@@ -147,11 +145,7 @@ async def prompt(*args, **kwargs):
     prompt_init()
     with patch_stdout():
         try:
-            while True:
-                tmp = await prompt_toolkit.prompt(*args, async_=True, **kwargs)
-                if tmp:
-                    break
-            return tmp
+            return await prompt_toolkit.prompt(*args, async_=True, **kwargs)
         except EOFError:
             return None
 
@@ -228,20 +222,3 @@ def log_timer(label: str, show: bool = True, logger=None, **kwargs):
         else None
     )
     return DurationTimer(label, cb)
-
-
-def progress(*args, **kwargs):
-    return ProgressBar(*args, **kwargs)
-
-
-def require_indy():
-    try:
-        from indy.libindy import _cdll
-
-        _cdll()
-    except ImportError:
-        print("python3-indy module not installed")
-        sys.exit(1)
-    except OSError:
-        print("libindy shared library could not be loaded")
-        sys.exit(1)

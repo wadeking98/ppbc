@@ -1,6 +1,6 @@
 """Utilities related to logging."""
 
-from logging import getLogger, FileHandler
+from logging import getLogger
 from logging.config import fileConfig
 from os import path
 
@@ -11,12 +11,7 @@ class LoggingConfigurator:
     """Utility class used to configure logging and print an informative start banner."""
 
     @classmethod
-    def configure(
-        cls,
-        logging_config_path: str = None,
-        log_level: str = None,
-        log_file: str = None,
-    ):
+    def configure(cls, logging_config_path: str = None, log_level: str = None):
         """
         Configure logger.
 
@@ -33,10 +28,6 @@ class LoggingConfigurator:
             )
 
         fileConfig(config_path, disable_existing_loggers=False)
-
-        if log_file:
-            getLogger().handlers.clear()
-            getLogger().handlers.append(FileHandler(log_file, encoding="utf-8"))
 
         if log_level:
             log_level = log_level.upper()

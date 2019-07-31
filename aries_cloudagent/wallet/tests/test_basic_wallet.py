@@ -9,7 +9,9 @@ from aries_cloudagent.wallet.error import (
     WalletNotFoundError,
 )
 
-from aries_cloudagent.messaging.decorators.signature_decorator import SignatureDecorator
+from aries_cloudagent.messaging.decorators.signature_decorator import (
+    SignatureDecorator,
+)
 
 
 @pytest.fixture()

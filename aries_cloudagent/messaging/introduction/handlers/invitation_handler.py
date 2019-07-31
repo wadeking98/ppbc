@@ -13,7 +13,7 @@ class InvitationHandler(BaseHandler):
         self._logger.debug("InvitationHandler called with context %s", context)
         assert isinstance(context.message, Invitation)
 
-        if not context.connection_ready:
+        if not context.connection_active:
             raise HandlerException("No connection established for invitation message")
 
         service: BaseIntroductionService = await context.inject(

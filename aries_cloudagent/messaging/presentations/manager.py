@@ -10,6 +10,8 @@ from ...holder.base import BaseHolder
 from ...ledger.base import BaseLedger
 from ...verifier.base import BaseVerifier
 
+from ..responder import BaseResponder
+
 from .models.presentation_exchange import PresentationExchange
 from .messages.presentation_request import PresentationRequest
 from .messages.credential_presentation import CredentialPresentation
@@ -82,9 +84,8 @@ class PresentationManager:
             presentation_request=presentation_request,
             thread_id=presentation_request_message._thread_id,
         )
-        await presentation_exchange.save(
-            self.context, reason="Create presentation request"
-        )
+        await presentation_exchange.save(self.context)
+        await self.updated_record(presentation_exchange)
 
         return presentation_exchange, presentation_request_message
 
@@ -105,9 +106,8 @@ class PresentationManager:
             state=PresentationExchange.STATE_REQUEST_RECEIVED,
             presentation_request=json.loads(presentation_request_message.request),
         )
-        await presentation_exchange.save(
-            self.context, reason="Receive presentation request"
-        )
+        await presentation_exchange.save(self.context)
+        await self.updated_record(presentation_exchange)
 
         return presentation_exchange
 
@@ -207,11 +207,8 @@ class PresentationManager:
             PresentationExchange.STATE_PRESENTATION_SENT
         )
         presentation_exchange_record.presentation = presentation
-        await presentation_exchange_record.save(
-            self.context,
-            reason="Create presentation",
-            log_params={"requested_credentials": requested_credentials},
-        )
+        await presentation_exchange_record.save(self.context)
+        await self.updated_record(presentation_exchange_record)
 
         return presentation_exchange_record, presentation_message
 
@@ -227,9 +224,8 @@ class PresentationManager:
         presentation_exchange_record.state = (
             PresentationExchange.STATE_PRESENTATION_RECEIVED
         )
-        await presentation_exchange_record.save(
-            self.context, reason="Receive presentation"
-        )
+        await presentation_exchange_record.save(self.context)
+        await self.updated_record(presentation_exchange_record)
 
         return presentation_exchange_record
 
@@ -275,8 +271,16 @@ class PresentationManager:
         presentation_exchange_record.verified = "true" if verified else "false"
         presentation_exchange_record.state = PresentationExchange.STATE_VERIFIED
 
-        await presentation_exchange_record.save(
-            self.context, reason="Verify presentation"
-        )
+        await presentation_exchange_record.save(self.context)
+        await self.updated_record(presentation_exchange_record)
 
         return presentation_exchange_record
+
+    async def updated_record(self, presentation_exchange: PresentationExchange):
+        """Call webhook when the record is updated."""
+        responder = await self._context.inject(BaseResponder, required=False)
+        if responder:
+            await responder.send_webhook(
+                "presentations",
+                presentation_exchange.serialize()
+            )

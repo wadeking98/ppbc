@@ -13,7 +13,7 @@ class ForwardInvitationHandler(BaseHandler):
         self._logger.debug("ForwardInvitationHandler called with context %s", context)
         assert isinstance(context.message, ForwardInvitation)
 
-        if not context.connection_ready:
+        if not context.connection_active:
             raise HandlerException(
                 "No connection established for forward invitation message"
             )

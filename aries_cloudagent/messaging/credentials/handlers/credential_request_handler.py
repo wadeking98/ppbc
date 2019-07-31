@@ -25,7 +25,7 @@ class CredentialRequestHandler(BaseHandler):
             "Received credential request: %s", context.message.serialize(as_string=True)
         )
 
-        if not context.connection_ready:
+        if not context.connection_active:
             raise HandlerException("No connection established for credential request")
 
         credential_manager = CredentialManager(context)

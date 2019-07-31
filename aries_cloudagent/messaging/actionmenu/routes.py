@@ -99,7 +99,7 @@ async def actionmenu_perform(request: web.BaseRequest):
     except StorageNotFoundError:
         raise web.HTTPNotFound()
 
-    if connection.is_ready:
+    if connection.is_active:
         msg = Perform(name=params["name"], params=params.get("params"))
         await outbound_handler(msg, connection_id=connection_id)
         return web.json_response({})
@@ -126,7 +126,7 @@ async def actionmenu_request(request: web.BaseRequest):
         LOGGER.debug("Connection not found for action menu request: %s", connection_id)
         raise web.HTTPNotFound()
 
-    if connection.is_ready:
+    if connection.is_active:
         msg = MenuRequest()
         await outbound_handler(msg, connection_id=connection_id)
         return web.json_response({})
@@ -163,7 +163,7 @@ async def actionmenu_send(request: web.BaseRequest):
         )
         raise web.HTTPNotFound()
 
-    if connection.is_ready:
+    if connection.is_active:
         await outbound_handler(msg, connection_id=connection_id)
         return web.json_response({})
 

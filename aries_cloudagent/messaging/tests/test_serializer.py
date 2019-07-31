@@ -25,7 +25,6 @@ class TestMessageSerializer(AsyncTestCase):
     }
     test_transport_type = "http"
     test_seed = "testseed000000000000000000000001"
-    test_routing_seed = "testseed000000000000000000000002"
 
     def setUp(self):
         self.wallet = BasicWallet()
@@ -93,10 +92,9 @@ class TestMessageSerializer(AsyncTestCase):
 
     async def test_forward(self):
         local_did = await self.wallet.create_local_did(self.test_seed)
-        router_did = await self.wallet.create_local_did(self.test_routing_seed)
         serializer = MessageSerializer()
         recipient_keys = (local_did.verkey,)
-        routing_keys = (router_did.verkey,)
+        routing_keys = (local_did.verkey,)
         sender_key = local_did.verkey
         message_json = json.dumps(self.test_message)
 
@@ -111,6 +109,3 @@ class TestMessageSerializer(AsyncTestCase):
             self.context, packed_json, self.test_transport_type
         )
         assert serializer.extract_message_type(message_dict) == FORWARD
-        assert delivery.recipient_verkey == router_did.verkey
-        assert delivery.sender_verkey is None
-

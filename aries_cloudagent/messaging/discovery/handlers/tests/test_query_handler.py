@@ -34,4 +34,4 @@ class TestQueryHandler:
         result, target = messages[0]
         assert isinstance(result, Disclose) and result.protocols
         assert result.protocols[0]["pid"] == TEST_MESSAGE_FAMILY
-        assert not target
+        assert target is None

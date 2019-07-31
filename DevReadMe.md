@@ -1,4 +1,4 @@
-# Developer's Read Me for Hyperledger Aries Cloud Agent - Python <!-- omit in toc -->
+# Developer's Read Me for Hyperledger Aries Cloud Agent - Python  <!-- omit in toc -->
 
 See the [README](README.md) for details about this repository and information about how the Aries Cloud Agent - Python fits into the Aries project and relates to Indy.
 
@@ -23,11 +23,7 @@ The information on this page assumes you are developer with a background in dece
 
 ## Installing
 
-This package is [available on PyPI](https://pypi.org/project/aries-cloudagent/) and can be installed with the following command:
-
-```
-pip install aries-cloudagent
-```
+Instructions forthcoming. `aries_cloudagent` will be made available in the future as a python package at [pypi.org](https://pypi.org).
 
 ## Developer Demos
 
@@ -35,12 +31,12 @@ To put ACA-Py through its paces at the command line, checkout our [demos](docs/G
 
 ## Running
 
-After installing the PyPi package, the executable `aca-py` should be available in your PATH.
+After installing the PyPi package, the executable `acagent` should be available in your PATH.
 
 Find out more about the available command line parameters by running:
 
 ```bash
-aca-py --help
+acagent --help
 ```
 
 Currently you must specify at least one _inbound_ and one _outbound_ transport.
@@ -48,74 +44,14 @@ Currently you must specify at least one _inbound_ and one _outbound_ transport.
 For example:
 
 ```bash
-aca-py start    --inbound-transport http 0.0.0.0 8000 \
-                --outbound-transport http
+acagent     --inbound-transport http 0.0.0.0 8000 \
+            --inbound-transport http 0.0.0.0 8001 \
+            --inbound-transport ws 0.0.0.0 8002 \
+            --outbound-transport ws \
+            --outbound-transport http
 ```
 
-or
-
-```bash
-aca-py start    --inbound-transport http 0.0.0.0 8000 \
-                --inbound-transport ws 0.0.0.0 8001 \
-                --outbound-transport ws \
-                --outbound-transport http
-```
-
-Currently, Aries Cloud Agent Python ships with both inbound and outbound transport drivers for `http` and `websockets`. More information on how to develop your own transports will be coming soon.
-
-Most configuration parameters are provided to the the agent at startup. Refer to the section below for details on all available command-line arguments.
-
-### Command Line Arguments
-
-| **argument**                          | **format example**                                                                                                                            | **effect**                                                                                                                                                                                                                              | **required** |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| `--inbound-transport`, `-it`          | `--inbound-transport http 0.0.0.0 8000`                                                                                                       | Defines the inbound transport(s) to listen on. This parameter can be passed multiple times to create multiple interfaces. Supported internal transport types are `http` and `ws`.                                                       | `true`       |
-| `--outbound-transport`, `-ot`         | `--outbound-transport http`                                                                                                                   | Defines the outbound transport(s) to support for outgoing messages. This parameter can be passed multiple times to supoort multiple transport types. Supported internal transport types are `http` and `ws`.                            | `true`       |
-| `--log-config`                        | `--log-config /path/to/log/config.ini`                                                                                                        | Provides a custom [python logging config file](https://docs.python.org/3/library/logging.config.html#logging-config-fileformat) to use. By default, a [default logging config](config/default_logging_config.ini) is used.              | `false`      |
-| `--log-file`                        | `--log-file /path/to/logfile`                                                                                                        | Overrides the output destination for the root logger as defined by the log config file.              | `false`      |
-| `--log-level`                         | `--log-level debug`                                                                                                                           | Specifies the python log level.                                                                                                                                                                                                         | `false`      |
-| `--endpoint`, `-e`                    | `--endpoint https://example.com/agent-endpoint`                                                                                               | Specifies the endpoint for which other agents should contact this agent. This endpoint could point to a different agent if routing is configured. The endpoint is used in the formation of a connection with another agent.             | `false`      |
-| `--label`, `-l`                       | `--label "My Agent"`                                                                                                                          | Specifies the label for this agent. This label is publicized to other agents as part of forming a connection.                                                                                                                           | `false`      |
-| `--seed`                              | `--seed 00000000000000000000000000000000`                                                                                                     | Specifies the seed for the creation of a public did for use with a Hyperledger Indy ledger                                                                                                                                              | `false`      |
-| `--storage-type`                      | `--storage-type basic`                                                                                                                        | Specifies the type of storage provider to use for the internal storage engine. This storage interface is used to store internal state. Supported internal storage types are `basic` (memory) and `indy`.                                | `false`      |
-| `--wallet-key`                        | `--wallet-key b548y2b1919s71081583`                                                                                                           | Specifies the master key value to use when opening the wallet.                                                                                                                                                                          | `false`      |
-| `--wallet-name`                       | `--wallet-name my_wallet`                                                                                                                     | Specifies the wallet name. This is useful if you have multiple wallets.                                                                                                                                                                 | `false`      |
-| `--wallet-type`                       | `--wallet-type basic`                                                                                                                         | Specifies the type of indy wallet provider to use. Supported internal storage types are `basic` (memory) and `indy`.                                                                                                                    | `false`      |
-| `--wallet-storage-type`               | `--wallet-storage-type postgres_storage`                                                                                                      | Specifies the type of indy wallet backend to use. Supported internal storage types are `basic` (memory), `indy`, and `postgres_storage`.                                                                                                | `false`      |
-| `--wallet-storage-config`             | `--wallet-storage-config {"url":"localhost:5432"}`                                                                                            | Provides configuration data to the indy wallet storage driver.                                                                                                                                                                          | `false`      |
-| `--wallet-storage-creds`              | `--wallet-storage-creds {"account":"postgres","password":"mysecretpassword", "admin_account":"postgres","admin_password":"mysecretpassword"}` | Provides credential data to the indy wallet storage driver.                                                                                                                                                                             | `false`      |
-| `--pool-name`                         | `--pool-name my_pool`                                                                                                                         | Specifies the name of the indy pool to be opened. This is useful if you have multiple pool configurations.                                                                                                                              | `false`      |
-| `--genesis-transactions`              | `--genesis-transactions {"reqSignature":{},"txn":{"data":{"d... <snip>`                                                                       | Specifies the genesis transactions to use to connect to an Hyperledger Indy ledger.                                                                                                                                                     | `false`      |
-| `--genesis-url`                       | `--genesis-url https://example.com/genesis`                                                                                                   | Specifies the url from which to download the genesis transaction data. For example, the [Sovrin Network genesis transactions](https://raw.githubusercontent.com/sovrin-foundation/sovrin/master/sovrin/pool_transactions_live_genesis). | `false`      |
-| `--admin`                             | `--admin 0.0.0.0 5050`                                                                                                                        | Specifies the host and port on which to run the administrative server. If not provided, no admin server is made available.                                                                                                              | `false`      |
-| `--admin-insecure-mode`               | `--admin-insecure-mode`                                                                                                                       | Instructs the agent to run the admin web server in insecure mode. The admin server will be publicly available to anyone who has access to the interface.                                                                                | `false`      |
-| `--admin-api-key`                     | `--admin-api-key abc123`                                                                                                                      | Instructs the agent to protect all admin endpoints with the provided API key. The API must be pass in the header `X-API-Key: <api key>`.                                                                                                | `false`      |
-| `--debug`                             | `--debug`                                                                                                                                     | Enables a remote debugging service that can be accessed using [ptvsd](https://github.com/Microsoft/ptvsd). The framework will wait for the debugger to connect at start-up.                                                             | `false`      |
-| `--debug-connections`                 | `--debug-connections`                                                                                                                         | Enables additional logging of connection information.                                                                                                                                                                                   | `false`      |
-| `--public-invites`                    | `--public-invites`                                                                                                                            | Allows the creation and reception of invitations from the public DID.                                                                                                                                                                                    | `false`      |
-| `--auto-accept-invites`                    | `--auto-accept-invites`                                                                                                                            | Instructs the agent to automatically accept invites.                                                                                                                                                                                    | `false`      |
-| `--auto-accept-requests`                   | `--auto-accept-requests`                                                                                                                           | Instructs the agent to automatically connection requests.                                                                                                                                                                               | `false`      |
-| `--auto-ping-connection`              | `--auto-ping-connection`                                                                                                                      | Instructs the agent to automatically send a trust ping to a connection after it is formed.                                                                                                                                              | `false`      |
-| `--auto-respond-messages`             | `--auto-respond-messages`                                                                                                                     | Instructs the agent to automatically respond to basic messages.                                                                                                                                                                         | `false`      |
-| `--auto-respond-credential-offer`     | `--auto-respond-credential-offer`                                                                                                             | Instructs the agent to automatically respond to indy credential offers with a credential request.                                                                                                                                       | `false`      |
-| `--auto-respond-presentation-request` | `--auto-respond-presentation-request`                                                                                                         | Instructs the agent to automatically respond to indy presentation requests with a constructed presentation if exactly one credential can be retrieved for every referent in the presentation request.                                   | `false`      |
-| `--auto-verify-presentation`          | `--auto-verify-presentation`                                                                                                                  | Instructs the agent to automatically verify a presentation when it is received.                                                                                                                                                         | `false`      |
-| `--no-receive-invites`                | `--no-receive-invites`                                                                                                                        | Disables the receive invitations administration function.                                                                                                                                                                               | `false`      |
-| `--help-link`                         | `--help-link`                                                                                                                                 | Defines the help URL for the administration interface.                                                                                                                                                                                  | `false`      |
-| `--invite`                            | `--invite`                                                                                                                                    | Generates and print a new connection invitation URL on start-up.                                                                                                                                                                        | `false`      |
-| `--timing`                            | `--timing`                                                                                                                                    | Includes timing information in response messages.                                                                                                                                                                                       | `false`      |
-| `--protocol`                          | `--protocol`                                                                                                                                  | Instructs the agent to load an external protocol module.                                                                                                                                                                                | `false`      |
-| `--webhook-url`                       | `--webhook-url`                                                                                                                               | Instructs the agent to send webhooks containing internal state changes to a URL. This is useful for a controller to monitor changes and prompt new behaviour using the admin API.                                                       | `false`      |
-
-### Provisioning a Wallet
-
-It is possible to provision an Indy wallet before running an agent to avoid passing in the wallet seed on every invocation of `aca-py start`.
-
-```bash
-aca-py provision wallet --wallet-type indy --seed $SEED
-```
-
-For additional options, execute `aca-py provision --help`.
+Currently, Aries Cloud Agent Python ships with both inbound and outbound transport drivers for `http` and `websockets`. More information on how to develop your own drivers will be coming soon.
 
 ## Developing
 

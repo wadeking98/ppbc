@@ -14,6 +14,11 @@ from .tools import *
 def test(request):
     return HttpResponse(tools.agent_running(request.session.get("wallet")))
 
+def webhook(request):
+    if request.method == 'POST':
+        print(request.POST.text)
+        return HttpResponse(request.POST.text)
+
 def signup(request):
     """
     handles the signup request from the front end
@@ -322,7 +327,14 @@ def register_seed(request):
 def issue_cred(request):
     if request.method == 'POST':
         data = request.POST
-        clean_data = {key:val[0] for key,val in dict(data).items()}
+
+        #clean the data and get the conneciton id
+        clean_data = {key:val[0] for key,val in dict(data).items() if not(key=='id')}
+        conn_id = dict(data).get('id', None)
+
+        assert(conn_id is not None)
+        conn_id = conn_id[0]
+
         act_agent = get_active_agent(request)
 
         #push schema to the ledger
@@ -336,7 +348,6 @@ def issue_cred(request):
         )
 
         schema_id = json.loads(schema_resp.text).get("schema_id", None)
-        
 
         #push credential defenition to the ledger
         credef_resp = requests.post(
@@ -345,9 +356,19 @@ def issue_cred(request):
         )
 
         credef_id = json.loads(credef_resp.text).get("credential_definition_id", None)
-        print(credef_id)
         
-    return HttpResponse("hello")
+        #send credential through connection
+        credsend_resp = requests.post(
+            url="http://localhost:"+str(act_agent.outbound_trans)+"/credential_exchange/send",
+            data=json.dumps({
+                "connection_id":str(conn_id),
+                "credential_definition_id":str(credef_id),
+                "credential_values":clean_data
+                })
+        )
+
+        print(credsend_resp.text)
+    return HttpResponse(credef_id)
 
 def conn(request):
     return HttpResponse("hello from conn!")

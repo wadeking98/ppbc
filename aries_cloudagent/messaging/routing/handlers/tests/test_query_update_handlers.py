@@ -26,7 +26,7 @@ TEST_ROUTE_VERKEY = "9WCgWKUaAJj3VWxxtzvvMQN3AoFxoBtBDo9ntwJnVVCC"
 @pytest.fixture()
 def request_context() -> RequestContext:
     ctx = RequestContext()
-    ctx.connection_ready = True
+    ctx.connection_active = True
     ctx.connection_record = ConnectionRecord(connection_id="conn-id")
     ctx.message_delivery = MessageDelivery(sender_verkey=TEST_VERKEY)
     ctx.injector.bind_instance(BaseStorage, BasicStorage())
@@ -44,11 +44,11 @@ class TestQueryUpdateHandlers:
         assert len(messages) == 1
         result, target = messages[0]
         assert isinstance(result, RouteQueryResponse) and result.routes == []
-        assert not target
+        assert target is None
 
     @pytest.mark.asyncio
     async def test_no_connection(self, request_context):
-        request_context.connection_ready = False
+        request_context.connection_active = False
         request_context.message = RouteQueryRequest()
         handler = RouteQueryRequestHandler()
         responder = MockResponder()
@@ -79,7 +79,7 @@ class TestQueryUpdateHandlers:
         assert result.updated[0].recipient_key == TEST_VERKEY
         assert result.updated[0].action == RouteUpdate.ACTION_CREATE
         assert result.updated[0].result == RouteUpdated.RESULT_SUCCESS
-        assert not target
+        assert target is None
 
         request_context.message = RouteQueryRequest()
         query_handler = RouteQueryRequestHandler()
@@ -90,4 +90,4 @@ class TestQueryUpdateHandlers:
         result, target = messages[0]
         assert isinstance(result, RouteQueryResponse)
         assert result.routes[0].recipient_key == TEST_VERKEY
-        assert not target
+        assert target is None

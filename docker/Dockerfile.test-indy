@@ -12,7 +12,8 @@ ADD requirements.txt requirements.dev.txt ./
 
 RUN pip3 install --no-cache-dir \
 	-r requirements.txt \
-	-r requirements.dev.txt
+	-r requirements.dev.txt \
+	pytest
 
 ADD --chown=indy:root . .
 

@@ -16,5 +16,6 @@ urlpatterns = [
     path('del_conn/', views.del_conn, name='del_conn'),
     path('send_msg/', views.send_msg, name='send_msg'),
     path('register_seed/', views.register_seed, name='register_seed'),
-    path('issue_cred/', views.issue_cred, name='issue_cred')
+    path('issue_cred/', views.issue_cred, name='issue_cred'),
+    path('webhook/', views.webhook, name='webhook')
 ]

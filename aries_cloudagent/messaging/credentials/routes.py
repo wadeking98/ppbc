@@ -10,7 +10,6 @@ from marshmallow import fields, Schema
 from ...holder.base import BaseHolder
 from ...storage.error import StorageNotFoundError
 from ...wallet.error import WalletNotFoundError
-from ...messaging.problem_report.message import ProblemReport
 
 from ..connections.models.connection_record import ConnectionRecord
 
@@ -79,12 +78,6 @@ class CredentialListSchema(Schema):
     """Result schema for a credential query."""
 
     results = fields.List(fields.Nested(CredentialSchema()))
-
-
-class CredentialProblemReportRequestSchema(Schema):
-    """Request schema for sending a problem report."""
-
-    explain_ltxt = fields.Str(required=True)
 
 
 @docs(tags=["credentials"], summary="Fetch a credential from wallet by id")
@@ -248,7 +241,7 @@ async def credential_exchange_retrieve(request: web.BaseRequest):
 @response_schema(CredentialSendResultSchema(), 200)
 async def credential_exchange_send(request: web.BaseRequest):
     """
-    Request handler for sending a credential.
+    Request handler for sending a credential offer.
 
     Args:
         request: aiohttp request object
@@ -268,15 +261,9 @@ async def credential_exchange_send(request: web.BaseRequest):
     credential_values = body.get("credential_values")
 
     credential_manager = CredentialManager(context)
+    connection_record = await ConnectionRecord.retrieve_by_id(context, connection_id)
 
-    try:
-        connection_record = await ConnectionRecord.retrieve_by_id(
-            context, connection_id
-        )
-    except StorageNotFoundError:
-        raise web.HTTPBadRequest()
-
-    if not connection_record.is_ready:
+    if not connection_record.is_active:
         raise web.HTTPForbidden()
 
     credential_exchange_record = await credential_manager.prepare_send(
@@ -313,15 +300,9 @@ async def credential_exchange_send_offer(request: web.BaseRequest):
     credential_definition_id = body.get("credential_definition_id")
 
     credential_manager = CredentialManager(context)
+    connection_record = await ConnectionRecord.retrieve_by_id(context, connection_id)
 
-    try:
-        connection_record = await ConnectionRecord.retrieve_by_id(
-            context, connection_id
-        )
-    except StorageNotFoundError:
-        raise web.HTTPBadRequest()
-
-    if not connection_record.is_ready:
+    if not connection_record.is_active:
         raise web.HTTPForbidden()
 
     credential_exchange_record = await credential_manager.create_offer(
@@ -364,14 +345,9 @@ async def credential_exchange_send_request(request: web.BaseRequest):
 
     credential_manager = CredentialManager(context)
 
-    try:
-        connection_record = await ConnectionRecord.retrieve_by_id(
-            context, connection_id
-        )
-    except StorageNotFoundError:
-        raise web.HTTPBadRequest()
+    connection_record = await ConnectionRecord.retrieve_by_id(context, connection_id)
 
-    if not connection_record.is_ready:
+    if not connection_record.is_active:
         raise web.HTTPForbidden()
 
     (
@@ -414,14 +390,9 @@ async def credential_exchange_issue(request: web.BaseRequest):
     assert credential_exchange_record.state == CredentialExchange.STATE_REQUEST_RECEIVED
 
     credential_manager = CredentialManager(context)
-    try:
-        connection_record = await ConnectionRecord.retrieve_by_id(
-            context, connection_id
-        )
-    except StorageNotFoundError:
-        raise web.HTTPBadRequest()
 
-    if not connection_record.is_ready:
+    connection_record = await ConnectionRecord.retrieve_by_id(context, connection_id)
+    if not connection_record.is_active:
         raise web.HTTPForbidden()
 
     credential_exchange_record.credential_values = credential_values
@@ -432,86 +403,6 @@ async def credential_exchange_issue(request: web.BaseRequest):
 
     await outbound_handler(credential_issue_message, connection_id=connection_id)
     return web.json_response(credential_exchange_record.serialize())
-
-
-@docs(tags=["credential_exchange"], summary="Stores a received credential")
-@response_schema(CredentialRequestResultSchema(), 200)
-async def credential_exchange_store(request: web.BaseRequest):
-    """
-    Request handler for storing a credential request.
-
-    Args:
-        request: aiohttp request object
-
-    Returns:
-        The credential request details.
-
-    """
-
-    context = request.app["request_context"]
-
-    credential_exchange_id = request.match_info["id"]
-    credential_exchange_record = await CredentialExchange.retrieve_by_id(
-        context, credential_exchange_id
-    )
-    connection_id = credential_exchange_record.connection_id
-
-    assert (
-        credential_exchange_record.state == CredentialExchange.STATE_CREDENTIAL_RECEIVED
-    )
-
-    credential_manager = CredentialManager(context)
-
-    try:
-        connection_record = await ConnectionRecord.retrieve_by_id(
-            context, connection_id
-        )
-    except StorageNotFoundError:
-        raise web.HTTPBadRequest()
-
-    if not connection_record.is_ready:
-        raise web.HTTPForbidden()
-
-    credential_exchange_record = await credential_manager.store_credential(
-        credential_exchange_record
-    )
-
-    return web.json_response(credential_exchange_record.serialize())
-
-
-@docs(
-    tags=["credential_exchange"],
-    summary="Send a problem report for credential exchange",
-)
-@request_schema(CredentialProblemReportRequestSchema())
-async def credential_exchange_problem_report(request: web.BaseRequest):
-    """
-    Request handler for sending a problem report.
-
-    Args:
-        request: aiohttp request object
-    """
-    context = request.app["request_context"]
-    outbound_handler = request.app["outbound_message_router"]
-
-    credential_exchange_id = request.match_info["id"]
-    body = await request.json()
-
-    try:
-        credential_exchange_id = request.match_info["id"]
-        credential_exchange_record = await CredentialExchange.retrieve_by_id(
-            context, credential_exchange_id
-        )
-    except StorageNotFoundError:
-        raise web.HTTPNotFound()
-
-    error_result = ProblemReport(explain_ltxt=body["explain_ltxt"])
-    error_result.assign_thread_id(credential_exchange_record.thread_id)
-
-    await outbound_handler(
-        error_result, connection_id=credential_exchange_record.connection_id
-    )
-    return web.json_response({})
 
 
 @docs(
@@ -555,11 +446,6 @@ async def register(app: web.Application):
                 credential_exchange_send_request,
             ),
             web.post("/credential_exchange/{id}/issue", credential_exchange_issue),
-            web.post("/credential_exchange/{id}/store", credential_exchange_store),
-            web.post(
-                "/credential_exchange/{id}/problem_report",
-                credential_exchange_problem_report,
-            ),
             web.post("/credential_exchange/{id}/remove", credential_exchange_remove),
         ]
     )

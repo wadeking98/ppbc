@@ -20,17 +20,9 @@ DEFAULT_PYTHON_PATH = ".."
 
 RUN_MODE = os.getenv("RUNMODE")
 
-GENESIS_URL = os.getenv("GENESIS_URL")
-LEDGER_URL = os.getenv("LEDGER_URL")
-
 if RUN_MODE == "docker":
     DEFAULT_INTERNAL_HOST = os.getenv("DOCKERHOST") or "host.docker.internal"
     DEFAULT_EXTERNAL_HOST = DEFAULT_INTERNAL_HOST
-    DEFAULT_BIN_PATH = "./bin"
-    DEFAULT_PYTHON_PATH = "."
-elif RUN_MODE == "pwd":
-    # DEFAULT_INTERNAL_HOST =
-    DEFAULT_EXTERNAL_HOST = os.getenv("DOCKERHOST") or "host.docker.internal"
     DEFAULT_BIN_PATH = "./bin"
     DEFAULT_PYTHON_PATH = "."
 
@@ -38,11 +30,7 @@ elif RUN_MODE == "pwd":
 async def default_genesis_txns():
     genesis = None
     try:
-        if GENESIS_URL:
-            async with ClientSession() as session:
-                async with session.get(GENESIS_URL) as resp:
-                    genesis = await resp.text()
-        elif RUN_MODE == "docker":
+        if RUN_MODE == "docker":
             async with ClientSession() as session:
                 async with session.get(
                     f"http://{DEFAULT_EXTERNAL_HOST}:9000/genesis"
@@ -65,7 +53,6 @@ class DemoAgent:
         internal_host: str = None,
         external_host: str = None,
         genesis_data: str = None,
-        seed: str = "random",
         label: str = None,
         color: str = None,
         prefix: str = None,
@@ -87,13 +74,8 @@ class DemoAgent:
         self.postgres = DEFAULT_POSTGRES if postgres is None else postgres
         self.extra_args = extra_args
 
-        if RUN_MODE == "pwd":
-            self.endpoint = f"http://{self.external_host}".replace(
-                "{PORT}", str(http_port)
-            )
-        else:
-            self.endpoint = f"http://{self.external_host}:{http_port}"
-        self.admin_url = f"http://{self.internal_host}:{admin_port}"
+        self.endpoint = f"http://{self.external_host}:{http_port}"
+        self.admin_url = f"http://{self.external_host}:{admin_port}"
         self.webhook_port = None
         self.webhook_url = None
         self.webhook_site = None
@@ -103,60 +85,33 @@ class DemoAgent:
 
         rand_name = str(random.randint(100_000, 999_999))
         self.seed = (
-            ("my_seed_000000000000000000000000" + rand_name)[-32:]
-            if seed == "random"
-            else seed
+            params.get("seed") or ("my_seed_000000000000000000000000" + rand_name)[-32:]
         )
         self.storage_type = params.get("storage_type")
         self.wallet_type = params.get("wallet_type", "indy")
-        self.wallet_name = (
-            params.get("wallet_name") or self.ident.lower().replace(" ", "") + rand_name
-        )
+        self.wallet_name = params.get("wallet_name") or \
+            self.ident.lower().replace(' ', '') + rand_name
         self.wallet_key = params.get("wallet_key") or self.ident + rand_name
         self.did = None
-
-    async def register_schema_and_creddef(self, schema_name, version, schema_attrs):
-        # Create a schema
-        schema_body = {
-            "schema_name": schema_name,
-            "schema_version": version,
-            "attributes": schema_attrs,
-        }
-        schema_response = await self.admin_POST("/schemas", schema_body)
-        # log_json(json.dumps(schema_response), label="Schema:")
-        schema_id = schema_response["schema_id"]
-        log_msg("Schema ID:", schema_id)
-
-        # Create a cred def for the schema
-        credential_definition_body = {"schema_id": schema_id}
-        credential_definition_response = await self.admin_POST(
-            "/credential-definitions", credential_definition_body
-        )
-        credential_definition_id = credential_definition_response[
-            "credential_definition_id"
-        ]
-        log_msg("Cred def ID:", credential_definition_id)
-
-        return (schema_id, credential_definition_id)
 
     def get_agent_args(self):
         result = [
             ("--endpoint", self.endpoint),
             ("--label", self.label),
-            "--auto-ping-connection",
             "--auto-respond-messages",
+            "--accept-invites",
+            "--accept-requests",
+            "--auto-ping-connection",
             ("--inbound-transport", "http", "0.0.0.0", str(self.http_port)),
             ("--outbound-transport", "http"),
             ("--admin", "0.0.0.0", str(self.admin_port)),
-            "--admin-insecure-mode",
             ("--wallet-type", self.wallet_type),
             ("--wallet-name", self.wallet_name),
             ("--wallet-key", self.wallet_key),
+            ("--seed", self.seed),
         ]
         if self.genesis_data:
             result.append(("--genesis-transactions", self.genesis_data))
-        if self.seed:
-            result.append(("--seed", self.seed))
         if self.storage_type:
             result.append(("--storage-type", self.storage_type))
         if self.timing:
@@ -204,8 +159,6 @@ class DemoAgent:
 
     async def register_did(self, ledger_url: str = None, alias: str = None):
         self.log(f"Registering {self.ident} with seed {self.seed}")
-        if not ledger_url:
-            ledger_url = LEDGER_URL
         if not ledger_url:
             ledger_url = f"http://{self.external_host}:9000"
         data = {"alias": alias or self.ident, "seed": self.seed, "role": "TRUST_ANCHOR"}
@@ -260,12 +213,12 @@ class DemoAgent:
         return proc
 
     def get_process_args(self, bin_path: str = None):
-        cmd_path = "aca-py"
+        cmd_path = "acagent"
         if bin_path is None:
             bin_path = DEFAULT_BIN_PATH
         if bin_path:
             cmd_path = os.path.join(bin_path, cmd_path)
-        return list(flatten((["python3", cmd_path, "start"], self.get_agent_args())))
+        return list(flatten((["python3", cmd_path], self.get_agent_args())))
 
     async def start_process(
         self, python_path: str = None, bin_path: str = None, wait: bool = True
@@ -306,12 +259,7 @@ class DemoAgent:
 
     async def listen_webhooks(self, webhook_port):
         self.webhook_port = webhook_port
-        if RUN_MODE == "pwd":
-            self.webhook_url = f"http://localhost:{str(webhook_port)}/webhooks"
-        else:
-            self.webhook_url = (
-                f"http://{self.external_host}:{str(webhook_port)}/webhooks"
-            )
+        self.webhook_url = f"http://{self.external_host}:{str(webhook_port)}/webhooks"
         app = web.Application()
         app.add_routes([web.post("/webhooks/topic/{topic}/", self._receive_webhook)])
         runner = web.AppRunner(app)
@@ -331,10 +279,9 @@ class DemoAgent:
             if method:
                 await method(payload)
 
-    async def admin_request(self, method, path, data=None, text=False, params=None):
-        params = {k: v for (k, v) in (params or {}).items() if v is not None}
+    async def admin_request(self, method, path, data=None, text=False):
         async with self.client_session.request(
-            method, self.admin_url + path, json=data, params=params
+            method, self.admin_url + path, json=data
         ) as resp:
             if resp.status < 200 or resp.status > 299:
                 raise Exception(f"Unexpected HTTP response: {resp.status}")
@@ -348,11 +295,11 @@ class DemoAgent:
                     raise Exception(f"Error decoding JSON: {resp_text}") from e
             return resp_text
 
-    async def admin_GET(self, path, text=False, params=None):
-        return await self.admin_request("GET", path, None, text, params)
+    async def admin_GET(self, path, text=False):
+        return await self.admin_request("GET", path, None, text)
 
-    async def admin_POST(self, path, data=None, text=False, params=None):
-        return await self.admin_request("POST", path, data, text, params)
+    async def admin_POST(self, path, data=None, text=False):
+        return await self.admin_request("POST", path, data, text)
 
     async def detect_process(self):
         text = None

@@ -24,22 +24,36 @@ class ConnectionRequestHandler(BaseHandler):
 
         mgr = ConnectionManager(context)
         try:
-            await mgr.receive_request(context.message, context.message_delivery)
+            connection = await mgr.receive_request(
+                context.message, context.message_delivery
+            )
         except ConnectionManagerError as e:
             self._logger.exception("Error receiving connection request")
             if e.error_code:
-                target = None
-                if context.message.connection and context.message.connection.did_doc:
-                    try:
-                        target = mgr.diddoc_connection_target(
-                            context.message.connection.did_doc,
-                            context.message_delivery.recipient_verkey,
-                        )
-                    except ConnectionManagerError:
-                        self._logger.exception(
-                            "Error parsing DIDDoc for problem report"
-                        )
-                await responder.send_reply(
+                try:
+                    target = mgr.diddoc_connection_target(
+                        context.message.connection.did_doc,
+                        context.message_delivery.recipient_verkey,
+                    )
+                except ConnectionManagerError:
+                    self._logger.exception("Cannot return problem report")
+                    return
+                await responder.send(
                     ProblemReport(problem_code=e.error_code, explain=str(e)),
                     target=target,
                 )
+            return
+
+        if context.settings.get("accept_requests"):
+            try:
+                response = await mgr.create_response(connection)
+            except ConnectionManagerError:
+                self._logger.exception("Error creating response to connection request")
+                # no return message
+                return
+
+            target = await mgr.get_connection_target(connection)
+            self._logger.debug("Sending connection response to target: %s", target)
+            await responder.send(response, target=target)
+        else:
+            self._logger.error("Ignoring connection request")

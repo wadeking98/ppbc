@@ -72,6 +72,7 @@ export default {
             var post_data
             if(vm.type == "med"){
                 post_data={
+                    "id":vm.id,
                     "type":vm.type,
                     "med_name":vm.med_name,
                     "med_dosage":vm.med_dosage,
@@ -81,6 +82,7 @@ export default {
                 }
             }else if(vm.type=="imm"){
                 post_data={
+                    "id":vm.id,
                     "type":vm.type,
                     "imm_id":vm.imm_id,
                     "imm_name":vm.imm_name,
@@ -89,6 +91,7 @@ export default {
             }
             else if(vm.type=="lab"){
                 post_data={
+                    "id":vm.id,
                     "type":vm.type,
                     "lab_test":vm.lab_test,
                     "lab_result":vm.lab_result,

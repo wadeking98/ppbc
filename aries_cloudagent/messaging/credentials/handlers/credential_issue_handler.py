@@ -21,15 +21,9 @@ class CredentialIssueHandler(BaseHandler):
         assert isinstance(context.message, CredentialIssue)
         self._logger.info(f"Received credential: {context.message.issue}")
 
-        if not context.connection_ready:
+        if not context.connection_active:
             raise HandlerException("No connection established for credential request")
 
         credential_manager = CredentialManager(context)
 
-        credential_exchange_record = await credential_manager.receive_credential(
-            context.message
-        )
-
-        # Automatically move to next state if flag is set
-        if context.settings.get("debug.auto_store_credential"):
-            await credential_manager.store_credential(credential_exchange_record)
+        await credential_manager.store_credential(context.message)
