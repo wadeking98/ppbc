@@ -16,7 +16,8 @@
    
     
     <div id="nav">
-      <b-navbar toggleable="md" type="dark" variant="dark" v-if="this.$router.currentRoute.name != 'login'">
+      <b-navbar toggleable="md" type="dark" variant="dark" v-if="(this.$router.currentRoute.name != 'login')
+      &&(this.$router.currentRoute.name != 'signin')">
         <b-navbar-toggle target="nav_collapse"></b-navbar-toggle>
         <b-navbar-brand>
           <router-link to="/home">Health Gateway</router-link>

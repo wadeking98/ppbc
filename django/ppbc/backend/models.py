@@ -195,7 +195,7 @@ class agent(models.Model):
                     "--accept-requests",
                     "--auto-verify-presentation",
                     "--auto-respond-credential-offer",
-                    "--auto-respond-presentation-request",
+                    # "--auto-respond-presentation-request",
                     "--wallet-name", self.wallet_name,
                     "--wallet-type", "indy",
                     "--wallet-key", "key",

@@ -342,7 +342,7 @@ def issue_cred(request):
             url="http://localhost:"+str(act_agent.outbound_trans)+"/schemas",
             data=json.dumps({
                 "attributes":list(clean_data.keys()), 
-                "schema_name":str(clean_data.get("type",None))+"_"+act_agent.agent.name,
+                "schema_name":str(clean_data.get("type",None)),
                 "schema_version":"1.0"
             })
         )
@@ -369,6 +369,16 @@ def issue_cred(request):
 
         print(credsend_resp.text)
     return HttpResponse(credef_id)
+
+def get_cred(request):
+    wallet_name = request.session.get('wallet', None)
+    assert(wallet_name!=None)
+    agent_obj = agent.objects.get(wallet_name=wallet_name)
+    act_agent_obj = agent_obj.active_agent
+    port = act_agent_obj.outbound_trans
+
+    cred_resp = requests.get("http://localhost:"+str(port)+"/credentials")
+    return HttpResponse(cred_resp.text)
 
 def conn(request):
     return HttpResponse("hello from conn!")

@@ -19,13 +19,13 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="medication in medications" :key="medication.id">
+        <tr v-for="medication in medications" :key="medication.med_name">
           <!-- <td>{{ medication.resource.id }}</td> -->
-          <td>{{ medication.medicationCodeableConcept ? medication.medicationCodeableConcept.coding[0].display : medication.contained[0].code.coding[0].display }}</td>
-          <td>{{ medication.dosageInstruction[0].text }}</td>
-          <td>{{ medication.authoredOn }}</td>
-          <td>{{ medication.dispenseRequest.validityPeriod.end }}</td>
-          <td>{{ medication.dispenseRequest.numberOfRepeatsAllowed }}</td>
+          <td>{{ medication.attrs.med_name }}</td>
+          <td>{{ medication.attrs.med_dosage }}</td>
+          <td>{{ medication.attrs.persc_date }}</td>
+          <td>{{ medication.attrs.exp_date }}</td>
+          <td>{{ medication.attrs.num_renewals }}</td>
           <td>
             <b-btn @click="openModal(medication)" class="btn btn-light btn-sm">DETAILS</b-btn>
           </td>
@@ -59,12 +59,13 @@ export default {
     getAllMedications() {
       this.$http
         .get(
-          "http://ec2-34-219-63-247.us-west-2.compute.amazonaws.com:5000/api/medicationrequest"
+          "http://localhost:8000/api/credentials/"
         )
         .then(
           response => {
-            //console.log(response)
-            this.medications = response.body.medicationrequests;
+            console.log(response.body.results)
+            this.medications = response.body.results
+            .filter(med => med.attrs.type == "med");
             if (this.medications.length > 0) {
               this.hasMedications = true;
             }

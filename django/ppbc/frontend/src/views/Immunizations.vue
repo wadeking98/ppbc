@@ -2,16 +2,6 @@
   <div class="container">
     <br>
     <h1><font-awesome-icon icon="syringe"></font-awesome-icon> Immunizations</h1>
-    <div>
-      <b-form-group>
-        <div @click="this.getAllImmunizations" >
-          <b-form-radio v-model="patient" name="patient" value="Alice">Alice Jacobs</b-form-radio>
-        </div>
-        <div @click="this.getAllImmunizationsForChild">
-          <b-form-radio v-model="patient" name="patient" value="Alex">Alex Jacobs</b-form-radio>
-        </div>
-      </b-form-group>
-    </div>
     <table class="table">
       <thead>
         <tr>
@@ -23,18 +13,14 @@
             </button>
             Most Recent Administration (YYYY-MM-DD)
           </th>
-          <th>
-            <a v-if="this.patient === 'Alex'" href="https://drive.google.com/open?id=14bmr-ABh0uJQNRqQvIynnVGAI1EodCJU">
-              <button class="btn btn-primary">Download Certificate</button>
-            </a>
-          </th>
+          
         </tr>
       </thead>
       <tbody>
-        <tr v-for="immunization in immunizations" :key="immunization.lotNumber">
-          <td>{{ immunization.lotNumber }}</td>
-          <td>{{ immunization.vaccineCode.text }}</td>
-          <td>{{ immunization.occurrenceDateTime }}</td>
+        <tr v-for="immunization in immunizations" :key="immunization.attrs.imm_id">
+          <td>{{ immunization.attrs.imm_id }}</td>
+          <td>{{ immunization.attrs.imm_name }}</td>
+          <td>{{ immunization.attrs.imm_date }}</td>
           <td>
             <button class="btn btn-light btn-sm" @click="openImmunizationModal(immunization.resource)">DETAILS</button>
           </td>
@@ -52,34 +38,20 @@ export default {
     return {
       immunizations: [],
       sort: "new-to-old",
-      patient: "Alice"
     };
   },
   methods: {
     getAllImmunizations() {
       this.$http
-        .get("http://ec2-34-219-63-247.us-west-2.compute.amazonaws.com:5005/api/immunization")
+        .get("http://localhost:8000/api/credentials/")
         .then(
           response => {
-            console.log("RESPONSE:", response)
-            this.immunizations = response.body.immunizations;
+            console.log("RESPONSE:", response.body.results)
+            
+            this.immunizations = response.body.results
+            .filter(cred => cred.attrs.type == 'imm');
+
             this.sortImmunizations();
-            this.patient = "Alice"
-          },
-          response => {
-            console.error(response);
-          }
-        );
-    },
-    getAllImmunizationsForChild() {
-      this.$http
-        .get("http://ec2-34-219-63-247.us-west-2.compute.amazonaws.com:5005/api/immunization/child")
-        .then(
-          response => {
-            console.log("RESPONSE:", response)
-            this.immunizations = response.body.immunizations;
-            this.sortImmunizations();
-            this.patient = "Alex"
           },
           response => {
             console.error(response);
@@ -98,13 +70,7 @@ export default {
         this.sort = "new-to-old";
       }
       this.immunizations = this.immunizations.sort((a, b) => {
-        if (a.occurrenceDateTime < b.occurrenceDateTime) {
-          return val1;
-        }
-        if (a.occurrenceDateTime > b.occurrenceDateTime) {
-          return val2;
-        }
-        return 0;
+        return val1 ? a.imm_date < b.imm_date : val2
       });
     },
     openImmunizationModal(immunizationRow) {

@@ -20,9 +20,9 @@
       </thead>
       <tbody>
         <tr v-for="labResult in labResults" :key="labResult.id" class="accordion-toggle">
-          <td>{{ labResult.resource.code.text }}</td>
-          <td>{{ labResult.resource.component.length }}</td>
-          <td>{{ labResult.resource.effectiveDateTime }}</td>
+          <td>{{ labResult.attrs.lab_test }}</td>
+          <td>{{ labResult.attrs.lab_result }}</td>
+          <td>{{ labResult.attrs.lab_date }}</td>
           <td>
             <button
               class="btn btn-light btn-sm"
@@ -30,7 +30,7 @@
             >DETAILS</button>
           </td>
         </tr>
-        <tr class="details" v-if="this.isDetailsShowing == true">
+        <!-- <tr class="details" v-if="this.isDetailsShowing == true">
           <td>
             <p>Observation: {{labResults[0].resource.component[0].code.text}}</p>
             <p>Observation: {{labResults[0].resource.component[1].code.text}}</p>
@@ -59,7 +59,7 @@
             <p>Pass/Fail: <font-awesome-icon class="check-icon" icon="check"></font-awesome-icon></p>
           </td>
           <td></td>
-        </tr>
+        </tr> -->
       </tbody>
     </table>
   </div>
@@ -80,10 +80,11 @@ export default {
   methods: {
     getAllLabResults() {
       this.$http
-        .get("http://ec2-34-219-63-247.us-west-2.compute.amazonaws.com:5010/api/diagnosticreport")
+        .get("http://localhost:8000/api/credentials/")
         .then(response => {
           console.log(response);
-          this.labResults = response.body.data.entry;
+          this.labResults = response.body.results
+          .filter(lab => lab.attrs.type == "lab");
         });
     },
     toggleDetails() {
