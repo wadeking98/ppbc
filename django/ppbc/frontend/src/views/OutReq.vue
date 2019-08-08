@@ -1,6 +1,9 @@
 <template>
     <div>
         <b-form id="request-form" v-on:submit.prevent="send_req()">
+            <b-form-group label="Credential Request Title" label-for="cred-req-title">
+                <b-form-input type="text" v-model="attributes['title']" id="cred-req-title"></b-form-input>
+            </b-form-group>
             <b-form-group label="Credential Request Type" label-for="type-select" class="cred-select">
                 <b-form-select v-model="type" :options="options" 
                     id="type-select"></b-form-select>
@@ -44,17 +47,18 @@ export default {
                     "imm_date":false
                 },
                 "med":{
-                    "Medication Name":false,
-                    "Dosage":false,
-                    "Perscription Date":false,
-                    "Expiry Date":false,
-                    "# of Renewals":false
+                    "med_name":false,
+                    "med_dosage":false,
+                    "persc_date":false,
+                    "exp_date":false,
+                    "num_renewals":false
                 },
                 "lab":{
-                    "Lab Name":false,
-                    "Lab Result":false,
-                    "Lab Date":false
-                }
+                    "lab_test":false,
+                    "lab_result":false,
+                    "lab_date":false
+                },
+                "title":""
             },
             alias:{
                 "imm_id":"ID",
@@ -86,6 +90,7 @@ export default {
             var post_data = this.attributes[this.type]
             post_data["conn_id"]=this.id
             post_data["type"]=this.type
+            post_data["title"]=this.attributes["title"]
             console.log(post_data)
             axios.post('http://localhost:8000/api/send_cred_req/',post_data)
         }

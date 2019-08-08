@@ -389,7 +389,7 @@ def send_cred_req(request):
         request_data = {
             "version":"1.0",
             "connection_id":data["conn_id"],
-            "name":"proof of "+data["type"],
+            "name":data["title"],
             "requested_predicates":{},
             "requested_attributes":[]
         }
@@ -416,12 +416,34 @@ def get_req(request):
     resp = requests.get("http://localhost:"+str(port)+"/presentation_exchange")
     return HttpResponse(resp.text)
 
+def get_req_cred(request):
+    if request.method == "POST":
+        data = get_data(request)
+        if not (data.get('id',False) and data.get('referent',False)):
+            raise Exception("data id or refernt not set") 
+        port = get_act_port(request)
+        resp = requests.get("http://localhost:"+str(port)+"/presentation_exchange/"+str(data['id'])+"/credentials/"+str(data['referent']))
+        print("http://localhost:"+str(port)+"/presentation_exchange/"+str(data['id'])+"/credentials/"+str(data['referent']))
+        return HttpResponse(resp)
+    return HttpResponse("wrong method")
+
+
+def get_data(request):
+    data = request.POST if dict(request.POST) != {} else request.body.decode('utf-8')
+    if isinstance(data, str):
+        data = json.loads(data)
+    return data
+
+
 def conn(request):
     return HttpResponse("hello from conn!")
 
 
 def get_agent(request):
     return agent.objects.get(wallet_name=request.session["wallet"])
+
+def get_act_port(request):
+    return get_active_agent(request).outbound_trans
 
 def get_active_agent(request):
     agent_obj = get_agent(request)
