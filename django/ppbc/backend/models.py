@@ -206,6 +206,9 @@ class agent(models.Model):
                 #grab the process id of the agent
                 pid = proc.pid
                 
+                if active_agent.objects.filter(agent=self) is not None:
+                    active_agent.objects.filter(agent=self).delete()
+
                 act_agent = active_agent(agent=self,inbound_trans=it,outbound_trans=ot,pid=pid,login_date=datetime.datetime.now())
                 act_agent.save()
                 

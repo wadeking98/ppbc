@@ -5,6 +5,8 @@
     <h5>ID: {{ id }}</h5>
     <router-link class="options" :to="{name: 'messages', params:{conn_id:id}}">message</router-link>
     <router-link class="options" :to="{name: 'credentials', params:{conn_id:id}}">credential</router-link>
+    <router-link class="options" :to="{name: 'out_requests', params:{conn_id:id}}">send request</router-link>
+    <router-link class="options" :to="{name: 'in_requests', params:{conn_id:id}}">request response</router-link>
     <b-link class="options" @click="removeConn()">remove</b-link>
     </b-card>
 </template>

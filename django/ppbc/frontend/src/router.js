@@ -43,6 +43,16 @@ export default new Router({
       component: () => import('./views/Cred.vue'),
     },
     {
+      path: '/out_requests/:conn_id',
+      name: 'out_requests',
+      component:() => import('./views/OutReq.vue'),
+    },
+    {
+      path: '/in_requests/:conn_id',
+      name: 'in_requests',
+      component:() => import('./views/InReq.vue')
+    },
+    {
       path: '/profile',
       name: 'profile',
       // route level code-splitting

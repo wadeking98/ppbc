@@ -136,7 +136,6 @@ def signin(request):
         request.session['auth'] = (user is not None)
         request.session.set_expiry(0)
 
-        # TODO error checking (see if agent is already running)
         #get the agent and start it
         agent_obj = agent.objects.get(user=user)
         request.session["wallet"] = agent_obj.wallet_name
@@ -379,6 +378,43 @@ def get_cred(request):
 
     cred_resp = requests.get("http://localhost:"+str(port)+"/credentials")
     return HttpResponse(cred_resp.text)
+
+
+def send_cred_req(request):
+    if request.method == "POST":
+        #get data no matter if it's url encoded or json
+        data = request.POST if dict(request.POST) != {} else request.body.decode('utf-8')
+        data=json.loads(data)
+
+        request_data = {
+            "version":"1.0",
+            "connection_id":data["conn_id"],
+            "name":"proof of "+data["type"],
+            "requested_predicates":{},
+            "requested_attributes":[]
+        }
+
+        for key,val in data.items():
+            if val is True:
+                request_data["requested_attributes"].append({
+                    "restrictions":[],
+                    "name":key
+                })
+        print(request_data)
+
+        act_agent = get_active_agent(request)
+        port = act_agent.outbound_trans
+
+        resp = requests.post("http://localhost:"+str(port)+"/presentation_exchange/send_request",json.dumps(request_data))
+        print(resp.text)
+        return HttpResponse(resp)
+    return HttpResponse("wrong method")
+
+def get_req(request):
+    act_agent = get_active_agent(request)
+    port = act_agent.outbound_trans
+    resp = requests.get("http://localhost:"+str(port)+"/presentation_exchange")
+    return HttpResponse(resp.text)
 
 def conn(request):
     return HttpResponse("hello from conn!")

@@ -1,6 +1,6 @@
 <template>
     <div class="hello">
-        <h1>{{ id }}</h1>
+        <h1>{{ conn_obj.their_label }}</h1>
         <div v-for="act in activity" v-bind:key="act.id">
 
             <p v-if="act.direction=='received'">{{ conn_obj.their_label }} :
