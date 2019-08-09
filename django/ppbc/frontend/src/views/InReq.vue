@@ -5,19 +5,29 @@
                 <!-- create a card for each presentation request -->
                 <b-card class="req" bg-variant="info" text-variant="white">
                     <h5>Name: {{ req.presentation_request.name }}</h5>
-                    <h6>Status: {{ req.state }}</h6>
-                    <h6>Attributes:</h6>
+                    <h6>Status: {{ req_alias[req.state] }}</h6>
+                    <h6 v-if="req.state=='verified'">Verified Attributes:</h6>
+                    <h6 v-else-if="req.state=='presentation_sent'">Sent Attributes:</h6>
+                    <h6 v-else>Requested Attributes:</h6>
                     <!-- grab all the attributes in the credential that match
                     the presentation request -->
                     <div v-for="(val,key) in req.presentation_request.requested_attributes"
                     :key="key">
-                        <p class="attr" >{{ alias[val.name] }}</p>
+                        <p class="attr-val" 
+                        v-if="req.state=='verified' || req.state=='presentation_sent'">
+                            <!-- get the verified attribute values -->
+                            {{ alias[val.name] }}: 
+                            {{ req.presentation.requested_proof.revealed_attrs[key]['raw'] }}
+                        </p>
+                        <p class="attr" v-else>{{ alias[val.name] }}</p> 
                     </div>
 
                     <!-- load the request credentials on mouse down -->
                     <div v-if="req.state=='request_received'"
                     @mousedown="()=>{
                             id = req.presentation_exchange_id
+                            //since all attributes in a card are from the same credential,
+                            //we can just grab any attribute name and use it to get request credentials
                             attr = req.presentation_request.requested_attributes
                             refer = Object.keys(attr)[0]
                             get_req_cred(id, refer)
@@ -73,6 +83,13 @@ export default {
                 "lab_test":"Lab Name",
                 "lab_result":"Lab Result",
                 "lab_date":"Lab Date"
+            },
+
+            req_alias:{
+                "request_sent":"Pending",
+                "request_received":"Recieved",
+                "verified": "Verified",
+                "presentation_sent":"Sent"
             }
         }
     },
@@ -130,6 +147,9 @@ li{
 }
 .attr{
     margin-left:2vh;
+}
+.attr-val{
+    margin-left: 2vh;
 }
 </style>
 

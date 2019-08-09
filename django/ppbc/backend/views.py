@@ -513,8 +513,6 @@ def subm_pres(request):
                 "revealed":True
             }
         
-        print(post_data)
-        
         resp = requests.post(url, json.dumps(post_data))
         return HttpResponse(resp.text)
     return HttpResponse("wrong method")

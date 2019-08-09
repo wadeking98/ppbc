@@ -2,12 +2,26 @@
     <b-card bg-variant="info" text-variant="white">
     <h3>{{ partner }}</h3>
     <h5>Status: {{ status }}</h5>
-    <h5>ID: {{ id }}</h5>
-    <router-link class="options" :to="{name: 'messages', params:{conn_id:id}}">message</router-link>
-    <router-link class="options" :to="{name: 'credentials', params:{conn_id:id}}">credential</router-link>
-    <router-link class="options" :to="{name: 'out_requests', params:{conn_id:id}}">send request</router-link>
-    <router-link class="options" :to="{name: 'in_requests', params:{conn_id:id}}">request response</router-link>
-    <b-link class="options" @click="removeConn()">remove</b-link>
+
+    <router-link class="options" :to="{name: 'messages', params:{conn_id:id}}">
+        <b-button>message</b-button>
+    </router-link>
+
+    <router-link class="options" :to="{name: 'credentials', params:{conn_id:id}}">
+        <b-button>credential</b-button>
+    </router-link>
+
+    <router-link class="options" :to="{name: 'out_requests', params:{conn_id:id}}">
+        <b-button>send request</b-button>
+    </router-link>
+
+    <router-link class="options" :to="{name: 'in_requests', params:{conn_id:id}}">
+        <b-button>request response</b-button>
+    </router-link>
+
+    <b-link class="options" @click="removeConn()">
+        <b-button>remove</b-button>
+    </b-link>
     </b-card>
 </template>
 <script>
