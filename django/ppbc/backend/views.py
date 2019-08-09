@@ -316,6 +316,16 @@ def send_invite(request):
         
 
 def register_seed(request):
+    """
+    registers the wallet seed so that the agent wallet is connected to the
+    ledger
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    HttpResponse: the response object fromt he aries agent 
+    """
     if request.method == 'POST':
         agent_obj = get_agent(request)
         seed = agent_obj.seed
@@ -324,6 +334,16 @@ def register_seed(request):
     return HttpResponse("method not allowed")
 
 def issue_cred(request):
+    """
+    creates a schema defenition, credential defenition and finally
+    issues a credential to another agent over a connection
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    HttpResponse: the response object fromt he aries agent 
+    """
     if request.method == 'POST':
         data = request.POST
 
@@ -370,6 +390,15 @@ def issue_cred(request):
     return HttpResponse(credef_id)
 
 def get_cred(request):
+    """
+    fetches the user's credentials from the agent wallet
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    HttpResponse: the response object fromt he aries agent 
+    """
     wallet_name = request.session.get('wallet', None)
     assert(wallet_name!=None)
     agent_obj = agent.objects.get(wallet_name=wallet_name)
@@ -381,6 +410,16 @@ def get_cred(request):
 
 
 def send_cred_req(request):
+    """
+    sends a credential presentation request over a connection
+
+    Parameters:
+    request (request object): the request sent by the front end
+    containing the requested credential attributes
+
+    Returns:
+    HttpResponse: the response object fromt he aries agent 
+    """
     if request.method == "POST":
         #get data no matter if it's url encoded or json
         data = request.POST if dict(request.POST) != {} else request.body.decode('utf-8')
@@ -411,12 +450,30 @@ def send_cred_req(request):
     return HttpResponse("wrong method")
 
 def get_req(request):
+    """
+    gets all credential request exchanges
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    HttpResponse: the response object fromt he aries agent 
+    """
     act_agent = get_active_agent(request)
     port = act_agent.outbound_trans
     resp = requests.get("http://localhost:"+str(port)+"/presentation_exchange")
     return HttpResponse(resp.text)
 
 def get_req_cred(request):
+    """
+    get credentials that fit a certain presentation request
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    HttpResponse: the response object fromt he aries agent 
+    """
     if request.method == "POST":
         data = get_data(request)
         if not (data.get('id',False) and data.get('referent',False)):
@@ -427,8 +484,52 @@ def get_req_cred(request):
         return HttpResponse(resp)
     return HttpResponse("wrong method")
 
+def subm_pres(request):
+    """
+    submits the credential presentation
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    HttpResponse: the response object fromt he aries agent 
+    """
+    if request.method == "POST":
+        data = get_data(request)
+        req_id = list(data.keys())[0]
+
+        port = get_act_port(request)
+        url = "http://localhost:"+str(port)+"/presentation_exchange/"+str(req_id)+"/send_presentation"
+
+        #post data tempalte
+        post_data = {
+            "requested_predicates": {},
+            "requested_attributes": {},
+            "self_attested_attributes": {}
+          }
+        for key in data[req_id]:
+            post_data["requested_attributes"][key] = {
+                "cred_id":data[req_id][key],
+                "revealed":True
+            }
+        
+        print(post_data)
+        
+        resp = requests.post(url, json.dumps(post_data))
+        return HttpResponse(resp.text)
+    return HttpResponse("wrong method")
+
 
 def get_data(request):
+    """
+    cleans and returns data provided in a request
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    dict: the cleaned data
+    """
     data = request.POST if dict(request.POST) != {} else request.body.decode('utf-8')
     if isinstance(data, str):
         data = json.loads(data)
@@ -443,6 +544,15 @@ def get_agent(request):
     return agent.objects.get(wallet_name=request.session["wallet"])
 
 def get_act_port(request):
+    """
+    gets the port used by the current agent's api
+
+    Parameters:
+    request (request object): the request sent by the front end
+
+    Returns:
+    HttpResponse: the response object fromt he aries agent 
+    """
     return get_active_agent(request).outbound_trans
 
 def get_active_agent(request):

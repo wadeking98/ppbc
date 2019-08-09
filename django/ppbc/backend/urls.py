@@ -21,5 +21,6 @@ urlpatterns = [
     path('credentials/', views.get_cred, name='get_cred'),
     path('send_cred_req/', views.send_cred_req, name='send_cred_req'),
     path('get_req/', views.get_req, name='get_req'),
-    path('get_req_cred/', views.get_req_cred, name='get_req_cred')
+    path('get_req_cred/', views.get_req_cred, name='get_req_cred'),
+    path('subm_pres/', views.subm_pres, name='subm_pres')
 ]

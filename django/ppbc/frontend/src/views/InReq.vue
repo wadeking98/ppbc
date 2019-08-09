@@ -22,7 +22,7 @@
                             refer = Object.keys(attr)[0]
                             get_req_cred(id, refer)
                         }">
-                        <b-form v-on:submit.prevent="subm_cred(req.presentation_exchange_id)">
+                        <b-form v-on:submit.prevent="subm_cred(req)">
                             <b-form-select v-model="req_subm_vals[req.presentation_exchange_id]">
                                 <option :value="null">--Please Select a Credential--</option>
                                 <!-- create an option for each credential that is the same type as the
@@ -87,10 +87,22 @@ export default {
                 
             })
         },
-        subm_cred(req_id){
+        subm_cred(req){
             //get the presentation request id and the cred referent for
             //this proof request
-            console.log({"id":req_id,"ref":this.req_subm_vals[req_id]})
+            var req_id = req.presentation_exchange_id
+            var attr_keys = Object.keys(req.presentation_request.requested_attributes)
+
+            //build the submission data in the following form 
+            //{request id:{request attribute id:credential referent}}
+            var subm_data={}
+            subm_data[req_id]={}
+            attr_keys.forEach((attr_key)=>{
+                subm_data[req_id][attr_key] = this.req_subm_vals[req_id]
+            })
+
+            axios.post("http://localhost:8000/api/subm_pres/", subm_data)
+            console.log(subm_data)
         }
     },
     created(){
