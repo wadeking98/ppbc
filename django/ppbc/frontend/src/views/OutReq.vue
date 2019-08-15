@@ -19,7 +19,8 @@
                 </div>
             </b-form-group>
 
-            <b-button v-if="type!=''" variant=primary type=submit>Send Request</b-button>
+            <b-button v-if="type!='' && !loading" variant=primary type=submit>Send Request</b-button>
+            <b-spinner class="spin" v-else-if="loading"></b-spinner>
         </b-form>
     </div>
 </template>
@@ -32,6 +33,7 @@ export default {
             type:"",
             imm_date:"",
             med_name:"",
+            loading:false,
 
 
             options:[
@@ -87,12 +89,17 @@ export default {
             return queryString
         },
         send_req(){
-            var post_data = this.attributes[this.type]
+            //shallow copy the attributes object to post data
+            var post_data = Object.assign({},this.attributes[this.type])
+
             post_data["conn_id"]=this.id
             post_data["type"]=this.type
             post_data["title"]=this.attributes["title"]
             console.log(post_data)
-            axios.post('http://localhost:8000/api/send_cred_req/',post_data)
+            this.loading = true
+            axios.post('http://localhost:8000/api/send_cred_req/',post_data).then(()=>{
+                this.loading = false
+            })
         }
     }
 }

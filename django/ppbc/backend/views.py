@@ -517,6 +517,16 @@ def subm_pres(request):
         return HttpResponse(resp.text)
     return HttpResponse("wrong method")
 
+def remove_req(request):
+    if request.method == "POST":
+        data = get_data(request)
+        id = data.get("id", None)
+        assert(id is not None)
+        port = get_act_port(request)
+        resp = requests.post("http://localhost:"+str(port)+"/presentation_exchange/"+str(id)+"/remove")
+        return HttpResponse(resp.text)
+    return HttpResponse("wrong method")
+
 
 def get_data(request):
     """

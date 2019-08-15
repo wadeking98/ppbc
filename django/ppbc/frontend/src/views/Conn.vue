@@ -18,11 +18,12 @@
                 </optgroup>
 
             </b-form-select>
-            <b-button v-if="!loading" type="submit" variant="primary">Submit</b-button>
+            <b-button class="form-buttn" v-if="!loading" type="submit" variant="primary">Submit</b-button>
             <b-spinner v-else></b-spinner>
-            <b-button variant="primary" @click="loadConn()">Refresh</b-button>
+            <b-button class="form-buttn" variant="primary" @click="loadConn()">Refresh</b-button>
         </b-form>
 
+        
         <connection 
         v-for="conn in conenctions" 
         v-bind:wallet="conn.wallet" 
@@ -121,6 +122,10 @@ export default {
 }
 #req{
     display: inline-block;
+}
+.con, .form-buttn{
+    margin:2vh;
+    margin-left: 0vh;
 }
 </style>
 

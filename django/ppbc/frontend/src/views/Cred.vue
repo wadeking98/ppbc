@@ -24,7 +24,10 @@
                 <b-form-input class="cred-lab-date" type="date" v-model="lab_date" placeholder="Inspection Date"></b-form-input>
             </div>
 
-            <b-button v-if="type!=''" variant="primary" type="submit">Submit</b-button>
+            
+                <b-button class="loading" v-if="type!='' && !loading" variant="primary" type="submit">Submit</b-button>
+                <b-spinner class="spin" v-else-if="loading"></b-spinner>
+            
         </b-form>
 
     </div>
@@ -48,6 +51,7 @@ export default {
             lab_test:"",
             lab_result:"",
             lab_date:"",
+            loading:false,
             options:[
                 {value: null, text: '--Please Select a Credential Type--', disabled:true},
                 {value: "imm", text: "Immunization"},
@@ -99,7 +103,10 @@ export default {
                 }
             }
             console.log(this.to_query(post_data))
-            axios.post("http://localhost:8000/api/issue_cred/",this.to_query(post_data))
+            this.loading = true
+            axios.post("http://localhost:8000/api/issue_cred/",this.to_query(post_data)).then(()=>{
+                this.loading = false
+            })
         }
     }
 }
@@ -109,9 +116,15 @@ export default {
 .cred-form *{
     display: block;
 }
-.cred-form *:not(div){
+.cred-form *:not(.loading):not(div):not(.spin){
     margin:5vh;
     width:60vh;
+}
+.loading {
+    margin: 5vh;
+    width:10vh;
+}.spin{
+    margin: 5vh;
 }
 </style>
 

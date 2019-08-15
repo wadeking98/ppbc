@@ -22,9 +22,9 @@
                         <p class="attr" v-else>{{ alias[val.name] }}</p> 
                     </div>
 
-                    <!-- load the request credentials on mouse down -->
+                    <!-- load the request credentials on mouse over -->
                     <div v-if="req.state=='request_received'"
-                    @mousedown="()=>{
+                    @mouseover="()=>{
                             id = req.presentation_exchange_id
                             //since all attributes in a card are from the same credential,
                             //we can just grab any attribute name and use it to get request credentials
@@ -44,9 +44,11 @@
                                     :key="key">{{ alias[val.name] }} : {{ cred.cred_info.attrs[val.name] }} </p>
                                 </option>
                             </b-form-select>
-                            <b-button type="submit">Submit</b-button>
+                            <b-button class="req_sub" type="submit">Submit</b-button>
+                            
                         </b-form>
                     </div>
+                    <b-button class="req_rem" @click="remove_req(req.presentation_exchange_id)">Remove</b-button>
                 </b-card>
             </li>
         </ul>
@@ -118,21 +120,27 @@ export default {
                 subm_data[req_id][attr_key] = this.req_subm_vals[req_id]
             })
 
-            axios.post("http://localhost:8000/api/subm_pres/", subm_data)
+            axios.post("http://localhost:8000/api/subm_pres/", subm_data).then(this.refresh_req)
             console.log(subm_data)
+        },
+        refresh_req(){
+            axios.get("http://localhost:8000/api/get_req").then((response)=>{
+                this.requests = response.data.results
+                console.log(this.requests)
+                //initialize the request submition value dictionary for each
+                //presentation request
+                this.requests.forEach(req => {
+                    this.req_subm_vals[req.presentation_exchange_id]=""
+                });
+            })
+        },
+        remove_req(req_id){
+            axios.post("http://localhost:8000/api/remove_req/", {"id":req_id}).then(this.refresh_req)
         }
     },
     created(){
         this.id = this.$route.params.conn_id
-        axios.get("http://localhost:8000/api/get_req").then((response)=>{
-            this.requests = response.data.results
-            console.log(this.requests)
-            //initialize the request submition value dictionary for each
-            //presentation request
-            this.requests.forEach(req => {
-                this.req_subm_vals[req.presentation_exchange_id]=""
-            });
-        })
+        this.refresh_req()
     }
     
 }
@@ -150,6 +158,12 @@ li{
 }
 .attr-val{
     margin-left: 2vh;
+}
+.req_rem{
+    margin-top: 2vh;
+}
+.req_sub{
+    margin-top: 2vh;
 }
 </style>
 

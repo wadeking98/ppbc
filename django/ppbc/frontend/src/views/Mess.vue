@@ -15,8 +15,8 @@
                 v-model="msg"
                 placeholder="Message"
             ></b-form-input>
-            <b-button type="submit" variant="primary">Submit</b-button>
-            <b-button @click="refresh_msg()" variant="primary">Refresh</b-button>
+            <b-button class="form-buttn" type="submit" variant="primary">Submit</b-button>
+            <b-button class="form-buttn" @click="refresh_msg()" variant="primary">Refresh</b-button>
         </b-form>
     </div>
 </template>
