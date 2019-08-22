@@ -22,7 +22,7 @@
           <td>{{ immunization.attrs.imm_name }}</td>
           <td>{{ immunization.attrs.imm_date }}</td>
           <td>
-            <button class="btn btn-light btn-sm" @click="openImmunizationModal(immunization.resource)">DETAILS</button>
+            <b-button :pressed="false" @click="raw(immunization)" >Raw</b-button>
           </td>
         </tr>
       </tbody>
@@ -73,9 +73,11 @@ export default {
         return val1 ? a.imm_date < b.imm_date : val2
       });
     },
-    openImmunizationModal(immunizationRow) {
-      console.log(immunizationRow);
+
+    raw(imm){
+      alert(JSON.stringify(imm))
     }
+    
   },
   beforeMount() {
     this.getAllImmunizations();

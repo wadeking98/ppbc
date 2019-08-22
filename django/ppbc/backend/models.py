@@ -37,7 +37,7 @@ class agent(models.Model):
     
 
     @classmethod
-    def start(cls, agent_type, wallet_name):
+    def start(cls, agent_type, wallet_name, pswd):
         """
         atomically marks agent as allocated to the server or to a user,
         and starts an aries agent instance
@@ -50,7 +50,7 @@ class agent(models.Model):
             agent_obj = (cls.objects.select_for_update().get(wallet_name=wallet_name))
             agent_obj.user_allocated = (agent_obj.user_allocated or (agent_type=="usr"))
             agent_obj.server_allocated = (agent_obj.server_allocated or(agent_type=="srv"))
-            agent_obj.find_or_create()
+            agent_obj.find_or_create(pswd)
             #start the routing agent if it has not already started
             agent.start_router()
             agent_obj.save()
@@ -67,7 +67,7 @@ class agent(models.Model):
         if router_agent is None:
             router_agent = agent(user=router_usr, seed=tools.id_to_seed(router_usr.id),name="router",wallet_name="i_router_mail_com")
             router_agent.save()
-        router_agent.find_or_create(router=True)
+        router_agent.find_or_create("routerpswd",router=True)
 
 
     @classmethod
@@ -139,9 +139,8 @@ class agent(models.Model):
         """
         conns = requests.get(url).json().get('results')
         for conn in conns:
-            if conn.get('connection_id') == conn_id:
-                if conn.get('state') == "active":
-                    return True
+            if conn.get('connection_id') == conn_id and conn.get('state') == "active":
+                return True
         return False
 
 
@@ -161,7 +160,7 @@ class agent(models.Model):
         return port
 
 
-    def find_or_create(self, router=False):
+    def find_or_create(self, pswd, router=False):
         """
         creates the aries agent unless it's already running
         """
@@ -198,7 +197,7 @@ class agent(models.Model):
                     # "--auto-respond-presentation-request",
                     "--wallet-name", self.wallet_name,
                     "--wallet-type", "indy",
-                    "--wallet-key", "key",
+                    "--wallet-key", pswd,
                     "--wallet-storage-type", "postgres_storage",
                     "--wallet-storage-config", "{\"url\":\"172.0.0.5:5432\", \"max_connections\":5, \"connection_timeout\":10}",
                     "--wallet-storage-creds", "{\"account\":\"postgres\",\"password\":\"docker\",\"admin_account\":\"postgres\",\"admin_password\":\"docker\"}",
