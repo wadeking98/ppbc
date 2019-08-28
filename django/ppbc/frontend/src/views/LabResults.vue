@@ -11,11 +11,6 @@
           <th>
             Date of Inspection
           </th>
-          <th>
-            <button class="btn btn-primary" @click="getAllLabResults()">
-              <font-awesome-icon icon="sync-alt"/>
-            </button>
-          </th>
         </tr>
       </thead>
       <tbody>
@@ -23,43 +18,15 @@
           <td>{{ labResult.attrs.lab_test }}</td>
           <td>{{ labResult.attrs.lab_result }}</td>
           <td>{{ labResult.attrs.lab_date }}</td>
-          <td>
-            <button
-              class="btn btn-light btn-sm"
-              @click="toggleDetails()"
-            >DETAILS</button>
+          <td class="raw_data">
+            <b-button class="raw_buttn" @click="raw(labResult)">Raw</b-button>
+            <transition name=fade >
+              <b-card class="raw_lab" v-if="raw_lab.includes(labResult.attrs.lab_test)">
+                {{ JSON.stringify(labResult) }}
+              </b-card>
+            </transition>
           </td>
         </tr>
-        <!-- <tr class="details" v-if="this.isDetailsShowing == true">
-          <td>
-            <p>Observation: {{labResults[0].resource.component[0].code.text}}</p>
-            <p>Observation: {{labResults[0].resource.component[1].code.text}}</p>
-            <p>Observation: {{labResults[0].resource.component[2].code.text}}</p>
-            <p>Observation: {{labResults[0].resource.component[3].code.text}}</p>
-            <p>Observation: {{labResults[0].resource.component[4].code.text}}</p>
-            <p>Observation: {{labResults[0].resource.component[5].code.text}}</p>
-            <p>Observation: {{labResults[0].resource.component[6].code.text}}</p>
-          </td>
-          <td>
-            <p>Result: {{labResults[0].resource.component[0].valueQuantity.value}} {{labResults[0].resource.component[0].valueQuantity.unit}}</p>
-            <p>Result: {{labResults[0].resource.component[1].valueQuantity.value}} {{labResults[0].resource.component[1].valueQuantity.unit}}</p>
-            <p>Result: {{labResults[0].resource.component[2].valueQuantity.value}} {{labResults[0].resource.component[2].valueQuantity.unit}}</p>
-            <p>Result: {{labResults[0].resource.component[3].valueQuantity.value}} {{labResults[0].resource.component[3].valueQuantity.unit}}</p>
-            <p>Result: {{labResults[0].resource.component[4].valueQuantity.value}} {{labResults[0].resource.component[4].valueQuantity.unit}}</p>
-            <p>Result: {{labResults[0].resource.component[5].valueQuantity.value}} {{labResults[0].resource.component[5].valueQuantity.unit}}</p>
-            <p>Result: {{labResults[0].resource.component[6].valueQuantity.value}} {{labResults[0].resource.component[6].valueQuantity.unit}}</p>
-          </td>
-          <td>
-            <p>Pass/Fail: <font-awesome-icon class="check-icon" icon="check"></font-awesome-icon></p>
-            <p>Pass/Fail: <font-awesome-icon class="check-icon" icon="check"></font-awesome-icon></p>
-            <p>Pass/Fail: <font-awesome-icon class="check-icon" icon="check"></font-awesome-icon></p>
-            <p>Pass/Fail: <font-awesome-icon class="check-icon" icon="check"></font-awesome-icon></p>
-            <p>Pass/Fail: <font-awesome-icon class="check-icon" icon="check"></font-awesome-icon></p>
-            <p>Pass/Fail: <font-awesome-icon class="check-icon" icon="check"></font-awesome-icon></p>
-            <p>Pass/Fail: <font-awesome-icon class="check-icon" icon="check"></font-awesome-icon></p>
-          </td>
-          <td></td>
-        </tr> -->
       </tbody>
     </table>
   </div>
@@ -73,6 +40,7 @@ export default {
   data: () => {
     return {
       labResults: [],
+      raw_lab:[],
       isDetailsShowing: false
     };
   },
@@ -87,13 +55,14 @@ export default {
           .filter(lab => lab.attrs.type == "lab");
         });
     },
-    toggleDetails() {
-      if (!this.isDetailsShowing) {
-        this.isDetailsShowing = true;
-      } else {
-        this.isDetailsShowing = false;
+    raw(lab){
+      if(this.raw_lab.includes(lab.attrs.lab_test)){
+        this.raw_lab.pop(lab.attrs.lab_test)
+      }else{
+        this.raw_lab.push(lab.attrs.lab_test)
       }
     }
+
   },
   beforeMount() {
     this.getAllLabResults();
@@ -110,5 +79,22 @@ export default {
 }
 .check-icon {
   color: green
+}
+.raw_data{
+  width:50vh;
+}
+.raw_lab{
+  margin-top: 2vh;
+  width: 50vh;
+}.raw_buttn{
+  position: relative;
+  left:45%;
+}
+
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.5s;
+}
+.fade-enter, .fade-leave-to /* .fade-leave-active below version 2.1.8 */ {
+  opacity:0;
 }
 </style>

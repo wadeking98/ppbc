@@ -11,11 +11,11 @@
           <th>Perscription Date</th>
           <th>Expiry Date</th>
           <th># of Renewals Left</th>
-          <th>
+          <!-- <th>
             <button class="btn btn-primary" v-on:click="getAllMedications()">
               <font-awesome-icon icon="sync-alt"/>
             </button>
-          </th>
+          </th> -->
         </tr>
       </thead>
       <tbody>
@@ -26,8 +26,13 @@
           <td>{{ medication.attrs.persc_date }}</td>
           <td>{{ medication.attrs.exp_date }}</td>
           <td>{{ medication.attrs.num_renewals }}</td>
-          <td>
-            <b-btn @click="openModal(medication)" class="btn btn-light btn-sm">DETAILS</b-btn>
+          <td class="raw_data">
+            <b-button class="raw_buttn" @click="raw(medication)">RAW</b-button>
+            <transition name=fade >
+              <b-card class="raw_med" v-if="raw_med.includes(medication.attrs.med_name)">
+                {{ JSON.stringify(medication) }}
+              </b-card>
+            </transition>
           </td>
         </tr>
       </tbody>
@@ -49,6 +54,7 @@ export default {
   data: () => {
     return {
       hasMedications: true,
+      raw_med:[],
       medications: []
     };
   },
@@ -56,6 +62,14 @@ export default {
     "medicaiton-modal": MedicationModal
   },
   methods: {
+    raw(med){
+      if(this.raw_med.includes(med.attrs.med_name)){
+        this.raw_med.pop(med.attrs.med_name)
+      }else{
+        this.raw_med.push(med.attrs.med_name)
+      }
+      console.log(this.raw_med)
+    },
     getAllMedications() {
       this.$http
         .get(
@@ -85,7 +99,23 @@ export default {
 </script>
 
 <style scoped>
+.raw_med{
+  margin-top: 2vh;
+  width: 50vh;
+}.raw_buttn{
+  position: relative;
+  left:45%;
+}
+.raw_data{
+  width:50vh;
+}
 .container {
   text-align: left;
+}
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.5s;
+}
+.fade-enter, .fade-leave-to /* .fade-leave-active below version 2.1.8 */ {
+  opacity:0;
 }
 </style>

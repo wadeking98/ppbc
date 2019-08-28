@@ -333,7 +333,9 @@ def send_cred_req(request):
 
 def send_invite(request, routing=False):
     """
-    automatically connects two users, even if one is offline
+    In the demo version automatically connects two users, even if one is offline.
+    In the master version, both users must be online because you cannot start an agent
+    without providing the wallet key. hence you cannot connect an offline user to an online user
 
     Parameters:
     request (request object): the request sent by the front end

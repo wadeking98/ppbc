@@ -51,10 +51,8 @@ class agent(models.Model):
             agent_obj.user_allocated = (agent_obj.user_allocated or (agent_type=="usr"))
             agent_obj.server_allocated = (agent_obj.server_allocated or(agent_type=="srv"))
             agent_obj.find_or_create(pswd)
-            #start the routing agent if it has not already started
-            agent.start_router()
             agent_obj.save()
-
+            
     
     @classmethod
     def start_router(cls):
@@ -97,6 +95,8 @@ class agent(models.Model):
     def try_post(cls, url, data, max_iter=10):
         """
         polling loop, sleeps until post succeeds or max_iter is used
+        This function should be replaced when moving to an Aries version that
+        supports webhooks
 
         Parameters:
         url (str): the url to post to
@@ -116,6 +116,8 @@ class agent(models.Model):
     def wait_until_conn(cls, url, conn_id,max_iter=10):
         """
         polling loop waits until connection becomes active
+        This function should be replaced when moving to an Aries version that
+        supports webhooks
 
         Parameters:
         url (str): the url of where to get the connections
@@ -137,11 +139,12 @@ class agent(models.Model):
         Returns:
         bool: True if conneciton is active
         """
+        success = False
         conns = requests.get(url).json().get('results')
         for conn in conns:
             if conn.get('connection_id') == conn_id and conn.get('state') == "active":
-                return True
-        return False
+                success = True
+        return success
 
 
     

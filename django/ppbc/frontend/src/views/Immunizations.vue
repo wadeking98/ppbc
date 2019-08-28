@@ -21,8 +21,13 @@
           <td>{{ immunization.attrs.imm_id }}</td>
           <td>{{ immunization.attrs.imm_name }}</td>
           <td>{{ immunization.attrs.imm_date }}</td>
-          <td>
-            <b-button :pressed="false" @click="raw(immunization)" >Raw</b-button>
+          <td class="raw_data">
+            <b-button class="raw_buttn" @click="raw(immunization)" >Raw</b-button>
+            <transition name=fade >
+              <b-card class="raw_imm" v-if="raw_imm.includes(immunization.attrs.imm_id)">
+                {{ JSON.stringify(immunization) }}
+              </b-card>
+            </transition>
           </td>
         </tr>
       </tbody>
@@ -37,10 +42,14 @@ export default {
   data: () => {
     return {
       immunizations: [],
+      raw_imm: [],
       sort: "new-to-old",
     };
   },
   methods: {
+    test(){
+      alert('test')
+    },
     getAllImmunizations() {
       this.$http
         .get("http://localhost:8000/api/credentials/")
@@ -52,9 +61,6 @@ export default {
             .filter(cred => cred.attrs.type == 'imm');
 
             this.sortImmunizations();
-          },
-          response => {
-            console.error(response);
           }
         );
     },
@@ -75,8 +81,14 @@ export default {
     },
 
     raw(imm){
-      alert(JSON.stringify(imm))
-    }
+      if(this.raw_imm.includes(imm.attrs.imm_id)){
+        this.raw_imm.pop(imm.attrs.imm_id)
+      }else{
+        this.raw_imm.push(imm.attrs.imm_id)
+      }
+      console.log(this.raw_imm)
+    },
+    
     
   },
   beforeMount() {
@@ -88,5 +100,22 @@ export default {
 <style scoped>
 .container {
   text-align: left;
+}
+.raw_data{
+  width:50vh;
+}
+.raw_imm{
+  margin-top: 2vh;
+  width: 50vh;
+}.raw_buttn{
+  position: relative;
+  left:45%;
+}
+
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.5s;
+}
+.fade-enter, .fade-leave-to /* .fade-leave-active below version 2.1.8 */ {
+  opacity:0;
 }
 </style>
