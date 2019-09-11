@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 cd $(dirname $0)
-~/ve/von/manage start &> /dev/null &
+~/von/manage start &> /dev/null &
 cd ~/ppbc/docker
 ./app
 cd ~/ppbc/django/ppbc/frontend

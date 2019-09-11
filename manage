@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+cd $(dirname $0)
+
+if [ $1 == "build" ] 
+then
+	sudo ~/von/manage build
+	sudo pip3 install -r requirements.txt
+	sudo pip3 install -r requirements.dev.txt
+	
+	cd django
+	sudo python3 -m venv .
+	source bin/activate
+	sudo pip3 install requirments.txt
+	
+	cd ppbc
+	sudo python3 manage.py makemigrations
+	sudo python3 manage.py makemigrations backend
+	sudo python3 manage.py migrate
+
+	cd frontend
+	sudo npm install
+
+elif [ $1 == "start" ]
+then ## start docker containers and run django server
+	sudo scripts/startapp
+	sudo python3 django/ppbc/manage.py runserver
+
+
+elif [ $1 == "kill" ]
+then ## kill all the running docker containers
+	containers=($(sudo docker ps -q))
+	if [ ${#containers[@]} -gt 0 ]
+	then ## if any containers are running, kill them
+		sudo docker kill $(sudo docker ps -q)
+	fi
+else
+	echo "invalid argument"
+fi

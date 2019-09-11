@@ -1,34 +1,30 @@
-# Hyperledger Aries Cloud Agent - Python  <!-- omit in toc -->
+#PPBC
+##Patient Portal British Columbia
+The PPBC project was developed by Wade King under the supervision of Quartech 
+Systems Ltd. PPBC is designed to allow users to manage their own health data, 
+and allow organizations to easily verify that data.  
+PPBC uses Hyperledger Aries for a verifyable credential library and
+von-network as a distributed ledger.
 
-[![CircleCI](https://circleci.com/gh/bcgov/aries-cloudagent-python.svg?style=shield)](https://circleci.com/gh/bcgov/aries-cloudagent-python)
-[![codecov](https://codecov.io/gh/bcgov/aries-cloudagent-python/branch/master/graph/badge.svg)](https://codecov.io/gh/bcgov/aries-cloudagent-python)
-[![Known Vulnerabilities](https://snyk.io/test/github/bcgov/aries-cloudagent-python/badge.svg)](https://snyk.io/test/github/bcgov/aries-cloudagent-python?targetFile=requirements.txt)
+You must have node, npm, python3 and pip3 installed and accessable on
+your path before you can run PPBC
 
-<!-- ![logo](/docs/assets/aries-cloudagent-python-logo-bw.png) -->
+to download and install PPBC navigate to your home directory and run the 
+following commands
+> git clone https://github.com/wadeking98/ppbc.git
+> git clone https://github.com/bcgov/von-network.git von
 
-## Table of Contents <!-- omit in toc -->
+Once both have finished downloading, change directories to the folder titled
+ppbc and run the following commands
+> ./manage build
+> ./manage start
 
-- [Introduction](#Introduction)
-- [Resources](#Resources)
+The build command will take some time, but after it completes building without
+any errors, it does not need to be built again
 
-## Introduction
+navigate to http://localhost:8000 and you should see PPBC up and running.
 
-Hyperledger Aries Cloud Agent Python (ACA-Py) is a foundation for building decentralized identity applications and services running in non-mobile environments using DIDcomm messaging, the did:peer method, and verifiable credentials. With ACA-Py, Hyperledger Indy and Aries developers can focus on building applications using familiar web development technologies instead of trying to learn the nuts and bolts of low-level SDKs.
+to kill PPBC press ctrl+c in the terminal running the PPBC server and then run
+the following command
+> ./manage kill
 
-The ACA-Py development model is pretty straight forward for those familiar with web development. An ACA-Py instance is always deployed with a paired "controller" application that provides the business logic for that Aries agent. The controller receives webhook event notifications from its instance of ACA-Py and uses an HTTP API exposed by the ACA-Py instance to provide direction on how to respond to those events. The source of the business logic is left to your imagination. An interface to a legacy system? A user interface for a person? Custom code to implement a new service? You can build your controller in any language that supports making and receiving HTTP requests. Wait...that's every language!
-
-ACA-Py currently supports "only" Hyperledger Indy's verifiable credentials scheme (which is pretty powerful). We are experimenting with adding support to ACA-Py for other DID Ledgers and verifiable credential schemes.
-
-As we create ACA-Py, we're building resources so that developers with a wide-range of backgrounds can get productive with ACA-Py in a hurry. Scan the resources below and jump in.
-
-## Resources
-
-If you are experienced decentralized identity developer that knows Indy, is already familiar with the concepts behind Aries, and want to play with the code and perhaps start contributing, a traditional "install and go" page for developers can be found [here](DevReadMe.md).
-
-For everyone else, we've created a [Getting Started Guide](docs/GettingStartedAriesDev/README.md) that will take you from knowing next to nothing about decentralized identity to developing Aries-based business apps and services in a hurry. Along the way, you'll run some early Indy apps, apps built on ACA-Py and developer-oriented demos for interacting with ACA-Py. The guide has a good table of contents so that you can skip the parts you already know.
-
-We'll soon have a ReadTheDocs site published with docstrings extracted from the ACA-Py code.
-
-Not sure where your focus should be? Building apps? Aries? Indy? Indy's Blockchain? Ursa? Here is a [document](docs/GettingStartedAriesDev/IndyAriesDevOptions.md) that goes through the technical stack to show how it the projects fit together, so you can decide where you want to focus your efforts.
-
-The initial implementation of ACA-Py was developed by the Verifiable Organizations Network (VON) team based at the Province of British Columbia. To learn more about VON and what's happening with decentralized identity in British Columbia, please go to [https://vonx.io](https://vonx.io).
