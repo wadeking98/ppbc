@@ -1,5 +1,5 @@
-#PPBC  
-##Patient Portal British Columbia  
+# PPBC  
+## Patient Portal British Columbia  
 The PPBC project was developed by Wade King under the supervision of Quartech 
 Systems Ltd. PPBC is designed to allow users to manage their own health data, 
 and allow organizations to easily verify that data.  
