@@ -186,7 +186,7 @@ class agent(models.Model):
                 agent_env["PORTS"] = str(ot)+":"+str(ot)+" "+str(it)+":"+str(it)
                 agent_env["NAME"] = self.wallet_name
                 proc = subprocess.Popen([
-                    "../../scripts/run_docker",
+                    "./scripts/run_docker",
                     "-it", "http", "0.0.0.0", str(it),
                     "-ot", "http", "--admin", "0.0.0.0", str(ot),
                     "-e", "http://172.17.0.1:"+str(it),
@@ -204,7 +204,8 @@ class agent(models.Model):
                     "--wallet-storage-type", "postgres_storage",
                     "--wallet-storage-config", "{\"url\":\"172.0.0.5:5432\", \"max_connections\":5, \"connection_timeout\":10}",
                     "--wallet-storage-creds", "{\"account\":\"postgres\",\"password\":\"docker\",\"admin_account\":\"postgres\",\"admin_password\":\"docker\"}",
-                    "--label", self.name], env=agent_env, encoding="utf-8",)
+                    "--label", self.name
+                    ], env=agent_env, encoding="utf-8",)
                 #grab the process id of the agent
                 pid = proc.pid
                 
