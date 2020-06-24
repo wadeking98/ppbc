@@ -8,10 +8,10 @@ of the system to process a message.
 from typing import Mapping
 
 from ..config.injection_context import InjectionContext
+from ..connections.models.connection_record import ConnectionRecord
+from ..transport.inbound.receipt import MessageReceipt
 
 from .agent_message import AgentMessage
-from .connections.models.connection_record import ConnectionRecord
-from .message_delivery import MessageDelivery
 
 
 class RequestContext(InjectionContext):
@@ -30,13 +30,13 @@ class RequestContext(InjectionContext):
             self._scope_name = base_context.scope_name
             self._scopes = base_context._scopes
             self.start_scope("request")
-        self._connection_active = False
+        self._connection_ready = False
         self._connection_record = None
         self._message = None
-        self._message_delivery = None
+        self._message_receipt = None
 
     @property
-    def connection_active(self) -> bool:
+    def connection_ready(self) -> bool:
         """
         Accessor for the flag indicating an active connection with the sender.
 
@@ -44,10 +44,10 @@ class RequestContext(InjectionContext):
             True if the connection is active, else False
 
         """
-        return self._connection_active
+        return self._connection_ready
 
-    @connection_active.setter
-    def connection_active(self, active: bool):
+    @connection_ready.setter
+    def connection_ready(self, active: bool):
         """
         Setter for the flag indicating an active connection with the sender.
 
@@ -55,7 +55,7 @@ class RequestContext(InjectionContext):
             active: The new active value
 
         """
-        self._connection_active = active
+        self._connection_ready = active
 
     @property
     def connection_record(self) -> ConnectionRecord:
@@ -137,25 +137,25 @@ class RequestContext(InjectionContext):
         self._message = msg
 
     @property
-    def message_delivery(self) -> MessageDelivery:
+    def message_receipt(self) -> MessageReceipt:
         """
-        Accessor for the message delivery information.
+        Accessor for the message receipt information.
 
         Returns:
-            This context's message delivery information
+            This context's message receipt information
 
         """
-        return self._message_delivery
+        return self._message_receipt
 
-    @message_delivery.setter
-    def message_delivery(self, delivery: MessageDelivery):
+    @message_receipt.setter
+    def message_receipt(self, receipt: MessageReceipt):
         """
-        Setter for the message delivery information.
+        Setter for the message receipt information.
 
         Args:
-            msg: This context's new message delivery information
+            msg: This context's new message receipt information
         """
-        self._message_delivery = delivery
+        self._message_receipt = receipt
 
     def __repr__(self) -> str:
         """

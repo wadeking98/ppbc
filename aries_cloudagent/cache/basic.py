@@ -1,8 +1,7 @@
 """Basic in-memory cache implementation."""
 
-from datetime import datetime, timedelta
-
-from typing import Any, Text
+import time
+from typing import Any, Sequence, Text, Union
 
 from .base import BaseCache
 
@@ -12,17 +11,17 @@ class BasicCache(BaseCache):
 
     def __init__(self):
         """Initialize a `BasicCache` instance."""
-
+        super().__init__()
         # looks like { "key": { "expires": <epoch timestamp>, "value": <val> } }
         self._cache = {}
 
     def _remove_expired_cache_items(self):
         """Remove all expired items from cache."""
-        for key in self._cache.copy():  # iterate copy, del from original
-            cache_item_expiry = self._cache[key]["expires"]
+        for key, val in self._cache.copy().items():  # iterate copy, del from original
+            cache_item_expiry = val["expires"]
             if cache_item_expiry is None:
                 continue
-            now = datetime.now().timestamp()
+            now = time.perf_counter()
             if now >= cache_item_expiry:
                 del self._cache[key]
 
@@ -40,26 +39,22 @@ class BasicCache(BaseCache):
         self._remove_expired_cache_items()
         return self._cache.get(key)["value"] if self._cache.get(key) else None
 
-    async def set(self, key: Text, value: Any, ttl: int = None):
+    async def set(self, keys: Union[Text, Sequence[Text]], value: Any, ttl: int = None):
         """
         Add an item to the cache with an optional ttl.
 
         Overwrites existing cache entries.
 
         Args:
-            key: the key to set an item for
+            keys: the key or keys for which to set an item
             value: the value to store in the cache
             ttl: number of seconds that the record should persist
 
         """
         self._remove_expired_cache_items()
-        now = datetime.now()
-        if ttl:
-            expires = now + timedelta(seconds=ttl)
-            expires_ts = expires.timestamp()
+        expires_ts = time.perf_counter() + ttl if ttl else None
+        for key in [keys] if isinstance(keys, Text) else keys:
             self._cache[key] = {"expires": expires_ts, "value": value}
-        else:
-            self._cache[key] = {"expires": None, "value": value}
 
     async def clear(self, key: Text):
         """

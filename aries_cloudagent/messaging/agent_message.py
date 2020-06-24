@@ -1,7 +1,7 @@
 """Agent message base class and schema."""
 
 from collections import OrderedDict
-from typing import Union
+from typing import Mapping, Union
 import uuid
 
 from marshmallow import (
@@ -19,6 +19,12 @@ from .decorators.base import BaseDecoratorSet
 from .decorators.default import DecoratorSet
 from .decorators.signature_decorator import SignatureDecorator
 from .decorators.thread_decorator import ThreadDecorator
+from .decorators.trace_decorator import (
+    TraceDecorator,
+    TraceReport,
+    TRACE_MESSAGE_TARGET,
+    TRACE_LOG_TARGET,
+)
 from .models.base import (
     BaseModel,
     BaseModelError,
@@ -26,6 +32,7 @@ from .models.base import (
     resolve_class,
     resolve_meta_property,
 )
+from .valid import UUIDFour
 
 
 class AgentMessageError(BaseModelError):
@@ -61,7 +68,9 @@ class AgentMessage(BaseModel):
         else:
             self._message_id = str(uuid.uuid4())
             self._message_new_id = True
-        self._message_decorators = _decorators or DecoratorSet()
+        self._message_decorators = (
+            _decorators if _decorators is not None else DecoratorSet()
+        )
         if not self.Meta.message_type:
             raise TypeError(
                 "Can't instantiate abstract class {} with no message_type".format(
@@ -286,7 +295,85 @@ class AgentMessage(BaseModel):
             thid: The thread identifier
             pthid: The parent thread identifier
         """
-        self._thread = ThreadDecorator(thid=thid, pthid=pthid)
+        if thid or pthid:
+            self._thread = ThreadDecorator(thid=thid, pthid=pthid)
+        else:
+            self._thread = None
+
+    @property
+    def _trace(self) -> TraceDecorator:
+        """
+        Accessor for the message's trace decorator.
+
+        Returns:
+            The TraceDecorator for this message
+
+        """
+        return self._decorators.get("trace")
+
+    @_trace.setter
+    def _trace(self, val: Union[TraceDecorator, dict]):
+        """
+        Setter for the message's trace decorator.
+
+        Args:
+            val: TraceDecorator or dict to set as the trace
+        """
+        self._decorators["trace"] = val
+
+    def assign_trace_from(self, msg: "AgentMessage"):
+        """
+        Copy trace information from a previous message.
+
+        Args:
+            msg: The received message containing optional trace information
+        """
+        if msg and msg._trace:
+            # ignore if not a valid type
+            if isinstance(msg._trace, TraceDecorator) or isinstance(msg._trace, dict):
+                self._trace = msg._trace
+
+    def assign_trace_decorator(self, context, trace):
+        """
+        Copy trace from a json structure.
+
+        Args:
+            trace: string containing trace json stucture
+        """
+        if trace:
+            self.add_trace_decorator(
+                target=context.get("trace.target") if context else TRACE_LOG_TARGET,
+                full_thread=True,
+            )
+
+    def add_trace_decorator(
+        self, target: str = TRACE_LOG_TARGET, full_thread: bool = True
+    ):
+        """
+        Create a new trace decorator.
+
+        Args:
+            target: The trace target
+            full_thread: Full thread flag
+        """
+        if self._trace:
+            # don't replace if there is already a trace decorator
+            # (potentially holding trace reports already)
+            self._trace._target = target
+            self._trace._full_thread = full_thread
+        else:
+            self._trace = TraceDecorator(target=target, full_thread=full_thread)
+
+    def add_trace_report(self, val: Union[TraceReport, dict]):
+        """
+        Append a new trace report.
+
+        Args:
+            val: The trace target
+        """
+        if not self._trace:
+            self.add_trace_decorator(target=TRACE_MESSAGE_TARGET, full_thread=True)
+        self._trace.append_trace_report(val)
 
 
 class AgentMessageSchema(BaseModelSchema):
@@ -299,8 +386,19 @@ class AgentMessageSchema(BaseModelSchema):
         signed_fields = None
 
     # Avoid clobbering keywords
-    _type = fields.Str(data_key="@type", dump_only=True, required=False)
-    _id = fields.Str(data_key="@id", required=False)
+    _type = fields.Str(
+        data_key="@type",
+        dump_only=True,
+        required=False,
+        description="Message type",
+        example="did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/my-family/1.0/my-message-type",
+    )
+    _id = fields.Str(
+        data_key="@id",
+        required=False,
+        description="Message identifier",
+        example=UUIDFour.EXAMPLE,
+    )
 
     def __init__(self, *args, **kwargs):
         """
@@ -322,7 +420,7 @@ class AgentMessageSchema(BaseModelSchema):
         self._signatures = {}
 
     @pre_load
-    def extract_decorators(self, data):
+    def extract_decorators(self, data: Mapping, **kwargs):
         """
         Pre-load hook to extract the decorators and check the signed fields.
 
@@ -340,7 +438,7 @@ class AgentMessageSchema(BaseModelSchema):
             ValidationError: If there is a missing field signature
 
         """
-        processed = self._decorators.extract_decorators(data)
+        processed = self._decorators.extract_decorators(data, self.__class__)
 
         expect_fields = resolve_meta_property(self, "signed_fields") or ()
         found_signatures = {}
@@ -355,14 +453,14 @@ class AgentMessageSchema(BaseModelSchema):
                         f"Message defines both field signature and value: {field_name}"
                     )
                 found_signatures[field_name] = field["sig"]
-                processed[field_name], _ts = field["sig"].decode()
+                processed[field_name], _ = field["sig"].decode()  # _ = timestamp
         for field_name in expect_fields:
             if field_name not in found_signatures:
                 raise ValidationError(f"Expected field signature: {field_name}")
         return processed
 
     @post_load
-    def populate_decorators(self, obj):
+    def populate_decorators(self, obj, **kwargs):
         """
         Post-load hook to populate decorators on the message.
 
@@ -377,7 +475,7 @@ class AgentMessageSchema(BaseModelSchema):
         return obj
 
     @pre_dump
-    def check_dump_decorators(self, obj):
+    def check_dump_decorators(self, obj, **kwargs):
         """
         Pre-dump hook to validate and load the message decorators.
 
@@ -408,7 +506,7 @@ class AgentMessageSchema(BaseModelSchema):
         return obj
 
     @post_dump
-    def dump_decorators(self, data):
+    def dump_decorators(self, data, **kwargs):
         """
         Post-dump hook to write the decorators to the serialized output.
 
@@ -428,7 +526,7 @@ class AgentMessageSchema(BaseModelSchema):
         return result
 
     @post_dump
-    def replace_signatures(self, data):
+    def replace_signatures(self, data, **kwargs):
         """
         Post-dump hook to write the signatures to the serialized output.
 

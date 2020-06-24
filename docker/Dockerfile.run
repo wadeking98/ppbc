@@ -1,16 +1,18 @@
-FROM bcgovimages/von-image:py36-1.9-0
+FROM bcgovimages/von-image:py36-1.14-1
 
 ENV ENABLE_PTVSD 0
 
-ADD requirements.txt .
-ADD requirements.dev.txt .
+ADD requirements*.txt ./
 
 RUN pip3 install --no-cache-dir -r requirements.txt -r requirements.dev.txt
 
 ADD aries_cloudagent ./aries_cloudagent
 ADD bin ./bin
+ADD README.md ./
 ADD setup.py ./
 
 RUN pip3 install --no-cache-dir -e .
 
-ENTRYPOINT ["/bin/bash", "-c", "acagent \"$@\"", "--"]
+RUN mkdir logs && chown -R indy:indy logs && chmod -R ug+rw logs
+
+ENTRYPOINT ["/bin/bash", "-c", "aca-py \"$@\"", "--"]

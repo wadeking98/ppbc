@@ -2,23 +2,35 @@
 
 cd $(dirname $0)
 
-#docker build -t aries-cloudagent-run -f ../docker/Dockerfile.run .. || exit 1
+docker build -t aries-cloudagent-run -f ../docker/Dockerfile.run .. || exit 1
 
 ARGS=""
 for PORT in $PORTS; do
-	ARGS="${ARGS} -p $PORT"
+  ARGS="${ARGS} -p $PORT"
 done
 
 PTVSD_PORT="${PTVSD_PORT-5678}"
 
-if [ ! -z "${ENABLE_PTVSD}" ] || [[ "$@" == *--debug* ]]; then
-	ARGS="${ARGS} -e ENABLE_PTVSD=\"${ENABLE_PTVSD}\" -p $PTVSD_PORT:$PTVSD_PORT"
+for arg in $@; do
+  if [ "$arg" = "--debug" ]; then
+    ENABLE_PTVSD=1
+  fi
+done
+if [ ! -z "${ENABLE_PTVSD}" ]; then
+  ARGS="${ARGS} -e ENABLE_PTVSD=\"${ENABLE_PTVSD}\" -p $PTVSD_PORT:$PTVSD_PORT"
 fi
 
+ARGS="${ARGS} -v /$(pwd)/../logs:/home/indy/logs"
+
 if [ ! -z "${WEBHOOK_URL}" ]; then
-	ARGS="${ARGS} -e WEBHOOK_URL=\"${WEBHOOK_URL}\""
+  ARGS="${ARGS} -e WEBHOOK_URL=\"${WEBHOOK_URL}\""
+fi
+
+if [ "$OSTYPE" == "msys" ]; then
+  DOCKER="winpty docker"
+else
+  DOCKER="docker"
 fi
 
 RAND_NAME=$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)
-docker run --rm -ti --net=aries_net --name "$NAME" $ARGS aries-cloudagent-run "$@"
-
+$DOCKER run --rm -ti --name "aries-cloudagent-runner_${RAND_NAME}" $ARGS aries-cloudagent-run "$@"

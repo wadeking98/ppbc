@@ -1,56 +1,312 @@
+import json
 import pytest
+import os
 
-try:
-    from indy.libindy import _cdll
+import indy.anoncreds
+import indy.crypto
+import indy.did
+import indy.wallet
 
-    _cdll()
-except ImportError:
-    pytest.skip(
-        "skipping Indy-specific tests: python module not installed",
-        allow_module_level=True,
-    )
-except OSError:
-    pytest.skip(
-        "skipping Indy-specific tests: shared library not loaded",
-        allow_module_level=True,
-    )
+from asynctest import mock as async_mock
 
+from aries_cloudagent.wallet import indy as test_wallet
 from aries_cloudagent.wallet.indy import IndyWallet
+from aries_cloudagent.storage.error import StorageError, StorageSearchError
 from aries_cloudagent.storage.indy import IndyStorage
 from aries_cloudagent.storage.record import StorageRecord
-from aries_cloudagent.postgres import load_postgres_plugin
 
+from .. import indy as test_module
 from . import test_basic_storage
 
 
 @pytest.fixture()
 async def store():
+    key = await IndyWallet.generate_wallet_key()
     wallet = IndyWallet(
-        {"auto_create": True, "auto_remove": True, "name": "test-wallet"}
+        {
+            "auto_create": True,
+            "auto_remove": True,
+            "name": "test-wallet",
+            "key": key,
+            "key_derivation_method": "RAW",  # much slower tests with argon-hashed keys
+        }
     )
     await wallet.open()
     yield IndyStorage(wallet)
     await wallet.close()
 
 
+@pytest.mark.indy
 class TestIndyStorage(test_basic_storage.TestBasicStorage):
-    """ """
+    """Tests for indy storage."""
+
+    @pytest.mark.asyncio
+    async def test_record(self):
+        with async_mock.patch.object(
+            test_wallet, "load_postgres_plugin", async_mock.MagicMock()
+        ) as mock_load, async_mock.patch.object(
+            indy.wallet, "create_wallet", async_mock.CoroutineMock()
+        ) as mock_create, async_mock.patch.object(
+            indy.wallet, "open_wallet", async_mock.CoroutineMock()
+        ) as mock_open, async_mock.patch.object(
+            indy.anoncreds, "prover_create_master_secret", async_mock.CoroutineMock()
+        ) as mock_master, async_mock.patch.object(
+            indy.wallet, "close_wallet", async_mock.CoroutineMock()
+        ) as mock_close, async_mock.patch.object(
+            indy.wallet, "delete_wallet", async_mock.CoroutineMock()
+        ) as mock_delete:
+            fake_wallet = IndyWallet(
+                {
+                    "auto_create": True,
+                    "auto_remove": True,
+                    "name": "test_pg_wallet",
+                    "key": await IndyWallet.generate_wallet_key(),
+                    "key_derivation_method": "RAW",
+                    "storage_type": "postgres_storage",
+                    "storage_config": json.dumps({"url": "dummy"}),
+                    "storage_creds": json.dumps(
+                        {
+                            "account": "postgres",
+                            "password": "mysecretpassword",
+                            "admin_account": "postgres",
+                            "admin_password": "mysecretpassword",
+                        }
+                    ),
+                }
+            )
+            await fake_wallet.open()
+            storage = IndyStorage(fake_wallet)
+
+            for record_x in [
+                None,
+                StorageRecord(
+                    type="connection",
+                    value=json.dumps(
+                        {
+                            "initiator": "self",
+                            "invitation_key": "9XgL7Y4TBTJyVJdomT6axZGUFg9npxcrXnRT4CG8fWYg",
+                            "state": "invitation",
+                            "routing_state": "none",
+                            "error_msg": None,
+                            "their_label": None,
+                            "created_at": "2019-05-14 21:58:24.143260+00:00",
+                            "updated_at": "2019-05-14 21:58:24.143260+00:00",
+                        }
+                    ),
+                    tags={
+                        "initiator": "self",
+                        "invitation_key": "9XgL7Y4TBTJyVJdomT6axZGUFg9npxcrXnRT4CG8fWYg",
+                        "state": "invitation",
+                        "routing_state": "none",
+                    },
+                    id=None,
+                ),
+                StorageRecord(
+                    type=None,
+                    value=json.dumps(
+                        {
+                            "initiator": "self",
+                            "invitation_key": "9XgL7Y4TBTJyVJdomT6axZGUFg9npxcrXnRT4CG8fWYg",
+                            "state": "invitation",
+                            "routing_state": "none",
+                            "error_msg": None,
+                            "their_label": None,
+                            "created_at": "2019-05-14 21:58:24.143260+00:00",
+                            "updated_at": "2019-05-14 21:58:24.143260+00:00",
+                        }
+                    ),
+                    tags={
+                        "initiator": "self",
+                        "invitation_key": "9XgL7Y4TBTJyVJdomT6axZGUFg9npxcrXnRT4CG8fWYg",
+                        "state": "invitation",
+                        "routing_state": "none",
+                    },
+                    id="f96f76ec-0e9b-4f32-8237-f4219e6cf0c7",
+                ),
+                StorageRecord(
+                    type="connection",
+                    value=None,
+                    tags={
+                        "initiator": "self",
+                        "invitation_key": "9XgL7Y4TBTJyVJdomT6axZGUFg9npxcrXnRT4CG8fWYg",
+                        "state": "invitation",
+                        "routing_state": "none",
+                    },
+                    id="f96f76ec-0e9b-4f32-8237-f4219e6cf0c7",
+                ),
+            ]:
+                with pytest.raises(StorageError):
+                    await storage.add_record(record_x)
+
+            with pytest.raises(StorageError):
+                await storage.get_record(None, "dummy-id")
+            with pytest.raises(StorageError):
+                await storage.get_record("connection", None)
+
+            with async_mock.patch.object(
+                test_module.non_secrets, "get_wallet_record", async_mock.CoroutineMock()
+            ) as mock_get_record:
+                mock_get_record.side_effect = test_module.IndyError(
+                    test_module.ErrorCode.CommonInvalidStructure
+                )
+                with pytest.raises(test_module.StorageError):
+                    await storage.get_record("connection", "dummy-id")
+
+            with async_mock.patch.object(
+                test_module.non_secrets,
+                "update_wallet_record_value",
+                async_mock.CoroutineMock(),
+            ) as mock_update_value, async_mock.patch.object(
+                test_module.non_secrets,
+                "update_wallet_record_tags",
+                async_mock.CoroutineMock(),
+            ) as mock_update_tags, async_mock.patch.object(
+                test_module.non_secrets,
+                "delete_wallet_record",
+                async_mock.CoroutineMock(),
+            ) as mock_delete:
+                mock_update_value.side_effect = test_module.IndyError(
+                    test_module.ErrorCode.CommonInvalidStructure
+                )
+                mock_update_tags.side_effect = test_module.IndyError(
+                    test_module.ErrorCode.CommonInvalidStructure
+                )
+                mock_delete.side_effect = test_module.IndyError(
+                    test_module.ErrorCode.CommonInvalidStructure
+                )
+
+                rec = StorageRecord(
+                    type="connection",
+                    value=json.dumps(
+                        {
+                            "initiator": "self",
+                            "invitation_key": "9XgL7Y4TBTJyVJdomT6axZGUFg9npxcrXnRT4CG8fWYg",
+                            "state": "invitation",
+                            "routing_state": "none",
+                            "error_msg": None,
+                            "their_label": None,
+                            "created_at": "2019-05-14 21:58:24.143260+00:00",
+                            "updated_at": "2019-05-14 21:58:24.143260+00:00",
+                        }
+                    ),
+                    tags={
+                        "initiator": "self",
+                        "invitation_key": "9XgL7Y4TBTJyVJdomT6axZGUFg9npxcrXnRT4CG8fWYg",
+                        "state": "invitation",
+                        "routing_state": "none",
+                    },
+                    id="f96f76ec-0e9b-4f32-8237-f4219e6cf0c7",
+                )
+
+                with pytest.raises(test_module.StorageError):
+                    await storage.update_record_value(rec, "dummy-value")
+
+                with pytest.raises(test_module.StorageError):
+                    await storage.update_record_tags(rec, {"tag": "tag"})
+
+                with pytest.raises(test_module.StorageError):
+                    await storage.delete_record(rec)
+
+    @pytest.mark.asyncio
+    async def test_storage_search_x(self):
+        with async_mock.patch.object(
+            test_wallet, "load_postgres_plugin", async_mock.MagicMock()
+        ) as mock_load, async_mock.patch.object(
+            indy.wallet, "create_wallet", async_mock.CoroutineMock()
+        ) as mock_create, async_mock.patch.object(
+            indy.wallet, "open_wallet", async_mock.CoroutineMock()
+        ) as mock_open, async_mock.patch.object(
+            indy.anoncreds, "prover_create_master_secret", async_mock.CoroutineMock()
+        ) as mock_master, async_mock.patch.object(
+            indy.wallet, "close_wallet", async_mock.CoroutineMock()
+        ) as mock_close, async_mock.patch.object(
+            indy.wallet, "delete_wallet", async_mock.CoroutineMock()
+        ) as mock_delete:
+            fake_wallet = IndyWallet(
+                {
+                    "auto_create": True,
+                    "auto_remove": True,
+                    "name": "test_pg_wallet",
+                    "key": await IndyWallet.generate_wallet_key(),
+                    "key_derivation_method": "RAW",
+                    "storage_type": "postgres_storage",
+                    "storage_config": json.dumps({"url": "dummy"}),
+                    "storage_creds": json.dumps(
+                        {
+                            "account": "postgres",
+                            "password": "mysecretpassword",
+                            "admin_account": "postgres",
+                            "admin_password": "mysecretpassword",
+                        }
+                    ),
+                }
+            )
+            await fake_wallet.open()
+            storage = IndyStorage(fake_wallet)
+
+            search = storage.search_records("connection")
+            with pytest.raises(StorageSearchError):
+                await search.fetch(10)
+
+            with async_mock.patch.object(
+                indy.non_secrets, "open_wallet_search", async_mock.CoroutineMock()
+            ) as mock_indy_open_search, async_mock.patch.object(
+                indy.non_secrets, "close_wallet_search", async_mock.CoroutineMock()
+            ) as mock_indy_close_search:
+                mock_indy_open_search.side_effect = test_module.IndyError("no open")
+                search = storage.search_records("connection")
+                with pytest.raises(StorageSearchError):
+                    await search.open()
+                await search.close()
+
+            with async_mock.patch.object(
+                indy.non_secrets, "open_wallet_search", async_mock.CoroutineMock()
+            ) as mock_indy_open_search, async_mock.patch.object(
+                indy.non_secrets,
+                "fetch_wallet_search_next_records",
+                async_mock.CoroutineMock(),
+            ) as mock_indy_fetch, async_mock.patch.object(
+                indy.non_secrets, "close_wallet_search", async_mock.CoroutineMock()
+            ) as mock_indy_close_search:
+                mock_indy_fetch.side_effect = test_module.IndyError("no fetch")
+                search = storage.search_records("connection")
+                await search.open()
+                with pytest.raises(StorageSearchError):
+                    await search.fetch(10)
+                await search.close()
+
+            with async_mock.patch.object(
+                indy.non_secrets, "open_wallet_search", async_mock.CoroutineMock()
+            ) as mock_indy_open_search, async_mock.patch.object(
+                indy.non_secrets, "close_wallet_search", async_mock.CoroutineMock()
+            ) as mock_indy_close_search:
+                mock_indy_close_search.side_effect = test_module.IndyError("no close")
+                search = storage.search_records("connection")
+                await search.open()
+                with pytest.raises(StorageSearchError):
+                    await search.close()
 
     # TODO get these to run in docker ci/cd
-    # @pytest.mark.asyncio
+    @pytest.mark.asyncio
+    @pytest.mark.postgres
     async def test_postgres_wallet_storage_works(self):
         """
         Ensure that postgres wallet operations work (create and open wallet, store and search, drop wallet)
         """
-        load_postgres_plugin()
+        postgres_url = os.environ.get("POSTGRES_URL")
+        if not postgres_url:
+            pytest.fail("POSTGRES_URL not configured")
+
+        wallet_key = await IndyWallet.generate_wallet_key()
         postgres_wallet = IndyWallet(
             {
                 "auto_create": False,
                 "auto_remove": False,
                 "name": "test_pg_wallet",
-                "key": "my_postgres",
+                "key": wallet_key,
+                "key_derivation_method": "RAW",
                 "storage_type": "postgres_storage",
-                "storage_config": '{"url":"host.docker.internal:5432", "max_connections":5}',
+                "storage_config": '{"url":"' + postgres_url + '", "max_connections":5}',
                 "storage_creds": '{"account":"postgres","password":"mysecretpassword","admin_account":"postgres","admin_password":"mysecretpassword"}',
             }
         )
@@ -61,14 +317,25 @@ class TestIndyStorage(test_basic_storage.TestBasicStorage):
 
         # add and then fetch a record
         record = StorageRecord(
-            value='{"initiator": "self", "invitation_key": "9XgL7Y4TBTJyVJdomT6axZGUFg9npxcrXnRT4CG8fWYg", "state": "invitation", "routing_state": "none", "error_msg": null, "their_label": null, "created_at": "2019-05-14 21:58:24.143260+00:00", "updated_at": "2019-05-14 21:58:24.143260+00:00"}',
+            type="connection",
+            value=json.dumps(
+                {
+                    "initiator": "self",
+                    "invitation_key": "9XgL7Y4TBTJyVJdomT6axZGUFg9npxcrXnRT4CG8fWYg",
+                    "state": "invitation",
+                    "routing_state": "none",
+                    "error_msg": None,
+                    "their_label": None,
+                    "created_at": "2019-05-14 21:58:24.143260+00:00",
+                    "updated_at": "2019-05-14 21:58:24.143260+00:00",
+                }
+            ),
             tags={
                 "initiator": "self",
                 "invitation_key": "9XgL7Y4TBTJyVJdomT6axZGUFg9npxcrXnRT4CG8fWYg",
                 "state": "invitation",
                 "routing_state": "none",
             },
-            type="connection",
             id="f96f76ec-0e9b-4f32-8237-f4219e6cf0c7",
         )
         await storage.add_record(record)

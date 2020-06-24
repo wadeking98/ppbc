@@ -1,6 +1,6 @@
 #!/bin/bash
 export MSYS_NO_PATHCONV=1
-export DOCKERHOST=${APPLICATION_URL-$(docker run --rm --net=host codenvy/che-ip)}
+export DOCKERHOST=${APPLICATION_URL-$(docker run --rm --net=host eclipse/che-ip)}
 set -e
 
 SCRIPT_HOME="$(cd "$(dirname "$0")" && pwd)"
@@ -17,11 +17,14 @@ usage() {
 
       demo  - Build the demo docker image and run an integration test or demo.
 
+      provision - Provision an agent
+
+      start - Run an agent.
+
       test  - Run unit tests.
 
       test-indy  - Run unit tests, including Indy-specific tests.
 
-      start - Run an agent.
 EOF
   exit 1
 }
@@ -66,11 +69,15 @@ shift || COMMAND=usage
 case "${COMMAND}" in
 start|up)
   exportEnvironment "$@"
-  ../scripts/run_docker $(getStartupParams "$@")
+  ../scripts/run_docker start $(getStartupParams "$@")
+  ;;
+provision)
+  exportEnvironment "$@"
+  ../scripts/run_docker provision $(getStartupParams "$@")
   ;;
 demo)
   exportEnvironment "$@"
-  ../scripts/run_demo $(getStartupParams "$@")
+  ../demo/run_demo $(getStartupParams "$@")
   ;;
 test)
   exportEnvironment "$@"

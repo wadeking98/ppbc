@@ -1,13 +1,15 @@
 """Base classes for Models and Schemas."""
-
+import logging
 from abc import ABC
 import json
 from typing import Union
 
-from marshmallow import Schema, post_dump, pre_load, post_load, ValidationError
+from marshmallow import Schema, post_dump, pre_load, post_load, ValidationError, EXCLUDE
 
-from ...classloader import ClassLoader
-from ...error import BaseError
+from ...core.error import BaseError
+from ...utils.classloader import ClassLoader
+
+LOGGER = logging.getLogger(__name__)
 
 
 def resolve_class(the_cls, relative_cls: type = None):
@@ -120,11 +122,12 @@ class BaseModel(ABC):
             A model instance for this data
 
         """
-        schema = cls._get_schema_class()()
+        schema = cls._get_schema_class()(unknown=EXCLUDE)
         try:
             return schema.loads(obj) if isinstance(obj, str) else schema.load(obj)
         except ValidationError as e:
-            raise BaseModelError("Schema validation failed") from e
+            LOGGER.exception(f"{cls.__name__} message validation error:")
+            raise BaseModelError(f"{cls.__name__} schema validation failed") from e
 
     def serialize(self, as_string=False) -> dict:
         """
@@ -141,7 +144,10 @@ class BaseModel(ABC):
         try:
             return schema.dumps(self) if as_string else schema.dump(self)
         except ValidationError as e:
-            raise BaseModelError("Schema validation failed") from e
+            LOGGER.exception(f"{self.__class__.__name__} message serialization error:")
+            raise BaseModelError(
+                f"{self.__class__.__name__} schema validation failed"
+            ) from e
 
     @classmethod
     def from_json(cls, json_repr: Union[str, bytes]):
@@ -158,7 +164,8 @@ class BaseModel(ABC):
         try:
             parsed = json.loads(json_repr)
         except ValueError as e:
-            raise BaseModelError("JSON parsing failed") from e
+            LOGGER.exception(f"{cls.__name__} message parse error:")
+            raise BaseModelError(f"{cls.__name__} JSON parsing failed") from e
         return cls.deserialize(parsed)
 
     def to_json(self) -> str:
@@ -237,7 +244,7 @@ class BaseModelSchema(Schema):
         return self._get_model_class()
 
     @pre_load
-    def skip_dump_only(self, data):
+    def skip_dump_only(self, data, **kwargs):
         """
         Skip fields that are only expected during serialization.
 
@@ -260,7 +267,7 @@ class BaseModelSchema(Schema):
         return data
 
     @post_load
-    def make_model(self, data: dict):
+    def make_model(self, data: dict, **kwargs):
         """
         Return model instance after loading.
 
@@ -271,7 +278,7 @@ class BaseModelSchema(Schema):
         return self.Model(**data)
 
     @post_dump
-    def remove_skipped_values(self, data):
+    def remove_skipped_values(self, data, **kwargs):
         """
         Remove values that are are marked to skip.
 

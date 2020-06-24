@@ -24,6 +24,7 @@ class agent(object):
         self.wallet_name = wallet_name
 
     def start_agent():
+        pass
         
 
 if __name__ == '__main__':

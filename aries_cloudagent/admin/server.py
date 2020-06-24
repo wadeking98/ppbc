@@ -2,27 +2,31 @@
 
 import asyncio
 import logging
-from typing import Coroutine, Sequence, Set
+from typing import Callable, Coroutine, Sequence, Set
 import uuid
 
-from aiohttp import web, ClientSession
-from aiohttp_apispec import docs, response_schema, setup_aiohttp_apispec
+from aiohttp import web
+from aiohttp_apispec import (
+    docs,
+    response_schema,
+    setup_aiohttp_apispec,
+    validation_middleware,
+)
 import aiohttp_cors
 
 from marshmallow import fields, Schema
 
-from ..classloader import ClassLoader
-from ..config.base import ConfigError
 from ..config.injection_context import InjectionContext
-from ..messaging.outbound_message import OutboundMessage
+from ..core.plugin_registry import PluginRegistry
 from ..messaging.responder import BaseResponder
-from ..stats import Collector
-from ..task_processor import TaskProcessor
-from ..transport.outbound.queue.base import BaseOutboundMessageQueue
+from ..transport.queue.basic import BasicMessageQueue
+from ..transport.outbound.message import OutboundMessage
+from ..utils.stats import Collector
+from ..utils.task_queue import TaskQueue
+from ..version import __version__
 
 from .base_server import BaseAdminServer
 from .error import AdminSetupError
-from .routes import register_module_routes
 
 LOGGER = logging.getLogger(__name__)
 
@@ -30,7 +34,9 @@ LOGGER = logging.getLogger(__name__)
 class AdminModulesSchema(Schema):
     """Schema for the modules endpoint."""
 
-    result = fields.List(fields.Str())
+    result = fields.List(
+        fields.Str(description="admin module"), description="List of admin modules"
+    )
 
 
 class AdminStatusSchema(Schema):
@@ -40,7 +46,9 @@ class AdminStatusSchema(Schema):
 class AdminResponder(BaseResponder):
     """Handle outgoing messages from message handlers."""
 
-    def __init__(self, send: Coroutine, webhook: Coroutine, **kwargs):
+    def __init__(
+        self, context: InjectionContext, send: Coroutine, webhook: Coroutine, **kwargs
+    ):
         """
         Initialize an instance of `AdminResponder`.
 
@@ -49,6 +57,7 @@ class AdminResponder(BaseResponder):
 
         """
         super().__init__(**kwargs)
+        self._context = context
         self._send = send
         self._webhook = webhook
 
@@ -59,7 +68,7 @@ class AdminResponder(BaseResponder):
         Args:
             message: The `OutboundMessage` to be sent
         """
-        await self._send(message)
+        await self._send(self._context, message)
 
     async def send_webhook(self, topic: str, payload: dict):
         """
@@ -76,14 +85,16 @@ class WebhookTarget:
     """Class for managing webhook target information."""
 
     def __init__(
-        self, endpoint: str, topic_filter: Sequence[str] = None, retries: int = None
+        self,
+        endpoint: str,
+        topic_filter: Sequence[str] = None,
+        max_attempts: int = None,
     ):
         """Initialize the webhook target."""
         self.endpoint = endpoint
+        self.max_attempts = max_attempts
         self._topic_filter = None
-        self.retries = retries
-        # call setter
-        self.topic_filter = topic_filter
+        self.topic_filter = topic_filter  # call setter
 
     @property
     def topic_filter(self) -> Set[str]:
@@ -108,6 +119,9 @@ class AdminServer(BaseAdminServer):
         port: int,
         context: InjectionContext,
         outbound_message_router: Coroutine,
+        webhook_router: Callable,
+        task_queue: TaskQueue = None,
+        conductor_stats: Coroutine = None,
     ):
         """
         Initialize an AdminServer instance.
@@ -115,36 +129,82 @@ class AdminServer(BaseAdminServer):
         Args:
             host: Host to listen on
             port: Port to listen on
-
+            context: The application context instance
+            outbound_message_router: Coroutine for delivering outbound messages
+            webhook_router: Callable for delivering webhooks
+            task_queue: An optional task queue for handlers
         """
         self.app = None
+        self.admin_api_key = context.settings.get("admin.admin_api_key")
+        self.admin_insecure_mode = bool(
+            context.settings.get("admin.admin_insecure_mode")
+        )
         self.host = host
         self.port = port
+        self.conductor_stats = conductor_stats
         self.loaded_modules = []
-        self.webhook_queue = None
-        self.webhook_retries = 5
-        self.webhook_session: ClientSession = None
+        self.task_queue = task_queue
+        self.webhook_router = webhook_router
         self.webhook_targets = {}
-        self.webhook_task = None
-        self.webhook_processor: TaskProcessor = None
         self.websocket_queues = {}
         self.site = None
 
         self.context = context.start_scope("admin")
-        self.responder = AdminResponder(outbound_message_router, self.send_webhook)
+        self.responder = AdminResponder(
+            self.context, outbound_message_router, self.send_webhook
+        )
         self.context.injector.bind_instance(BaseResponder, self.responder)
 
     async def make_application(self) -> web.Application:
         """Get the aiohttp application instance."""
-        middlewares = []
-        stats: Collector = await self.context.inject(Collector, required=False)
-        if stats:
+
+        middlewares = [validation_middleware]
+
+        # admin-token and admin-token are mutually exclusive and required.
+        # This should be enforced during parameter parsing but to be sure,
+        # we check here.
+        assert self.admin_insecure_mode ^ bool(self.admin_api_key)
+
+        def is_unprotected_path(path: str):
+            return path in [
+                "/api/doc",
+                "/api/docs/swagger.json",
+                "/favicon.ico",
+                "/ws",  # ws handler checks authentication
+            ] or path.startswith("/static/swagger/")
+
+        # If admin_api_key is None, then admin_insecure_mode must be set so
+        # we can safely enable the admin server with no security
+        if self.admin_api_key:
+
+            @web.middleware
+            async def check_token(request, handler):
+                header_admin_api_key = request.headers.get("x-api-key")
+                valid_key = self.admin_api_key == header_admin_api_key
+
+                if valid_key or is_unprotected_path(request.path):
+                    return await handler(request)
+                else:
+                    raise web.HTTPUnauthorized()
+
+            middlewares.append(check_token)
+
+        collector: Collector = await self.context.inject(Collector, required=False)
+
+        if self.task_queue:
+
+            @web.middleware
+            async def apply_limiter(request, handler):
+                task = await self.task_queue.put(handler(request))
+                return await task
+
+            middlewares.append(apply_limiter)
+
+        elif collector:
 
             @web.middleware
             async def collect_stats(request, handler):
-                handler = stats.wrap_coro(
-                    handler, [handler.__qualname__, "any-admin-request"]
-                )
+                handler = collector.wrap_coro(handler, [handler.__qualname__])
                 return await handler(request)
 
             middlewares.append(collect_stats)
@@ -155,25 +215,19 @@ class AdminServer(BaseAdminServer):
 
         app.add_routes(
             [
-                web.get("/", self.redirect_handler),
-                web.get("/modules", self.modules_handler),
-                web.get("/status", self.status_handler),
+                web.get("/", self.redirect_handler, allow_head=False),
+                web.get("/plugins", self.plugins_handler, allow_head=False),
+                web.get("/status", self.status_handler, allow_head=False),
                 web.post("/status/reset", self.status_reset_handler),
-                web.get("/ws", self.websocket_handler),
+                web.get("/ws", self.websocket_handler, allow_head=False),
             ]
         )
-        await register_module_routes(app)
 
-        for protocol_module_path in self.context.settings.get("external_protocols", []):
-            try:
-                routes_module = ClassLoader.load_module(
-                    f"{protocol_module_path}.routes"
-                )
-                await routes_module.register(app)
-            except Exception as e:
-                raise ConfigError(
-                    f"Failed to load external protocol module '{protocol_module_path}'."
-                ) from e
+        plugin_registry: PluginRegistry = await self.context.inject(
+            PluginRegistry, required=False
+        )
+        if plugin_registry:
+            await plugin_registry.register_admin_routes(app)
 
         cors = aiohttp_cors.setup(
             app,
@@ -188,12 +242,12 @@ class AdminServer(BaseAdminServer):
         )
         for route in app.router.routes():
             cors.add(route)
+        # get agent label
+        agent_label = self.context.settings.get("default_label")
+        version_string = f"v{__version__}"
 
         setup_aiohttp_apispec(
-            app=app,
-            title="Aries Cloud Agent",
-            version="v1",
-            swagger_path="/api/doc",
+            app=app, title=agent_label, version=version_string, swagger_path="/api/doc"
         )
         app.on_startup.append(self.on_startup)
         return app
@@ -209,6 +263,13 @@ class AdminServer(BaseAdminServer):
         self.app = await self.make_application()
         runner = web.AppRunner(self.app)
         await runner.setup()
+
+        plugin_registry: PluginRegistry = await self.context.inject(
+            PluginRegistry, required=False
+        )
+        if plugin_registry:
+            plugin_registry.post_process_routes(self.app)
+
         self.site = web.TCPSite(runner, host=self.host, port=self.port)
 
         try:
@@ -226,21 +287,21 @@ class AdminServer(BaseAdminServer):
         if self.site:
             await self.site.stop()
             self.site = None
-        if self.webhook_queue:
-            self.webhook_queue.stop()
-            self.webhook_queue = None
-        if self.webhook_session:
-            await self.webhook_session.close()
-            self.webhook_session = None
 
     async def on_startup(self, app: web.Application):
         """Perform webserver startup actions."""
+        if self.admin_api_key:
+            swagger = app["swagger_dict"]
+            swagger["securityDefinitions"] = {
+                "ApiKeyHeader": {"type": "apiKey", "in": "header", "name": "X-API-KEY"}
+            }
+            swagger["security"] = [{"ApiKeyHeader": []}]
 
-    @docs(tags=["server"], summary="Fetch the list of loaded modules")
+    @docs(tags=["server"], summary="Fetch the list of loaded plugins")
     @response_schema(AdminModulesSchema(), 200)
-    async def modules_handler(self, request: web.BaseRequest):
+    async def plugins_handler(self, request: web.BaseRequest):
         """
-        Request handler for the loaded modules list.
+        Request handler for the loaded plugins list.
 
         Args:
             request: aiohttp request object
@@ -249,7 +310,11 @@ class AdminServer(BaseAdminServer):
             The module list response
 
         """
-        return web.json_response({"result": self.loaded_modules})
+        registry: PluginRegistry = await self.context.inject(
+            PluginRegistry, required=False
+        )
+        plugins = registry and sorted(registry.plugin_names) or []
+        return web.json_response({"result": plugins})
 
     @docs(tags=["server"], summary="Fetch the server status")
     @response_schema(AdminStatusSchema(), 200)
@@ -264,10 +329,12 @@ class AdminServer(BaseAdminServer):
             The web response
 
         """
-        status = {}
+        status = {"version": __version__}
         collector: Collector = await self.context.inject(Collector, required=False)
         if collector:
             status["timing"] = collector.results
+        if self.conductor_stats:
+            status["conductor"] = await self.conductor_stats()
         return web.json_response(status)
 
     @docs(tags=["server"], summary="Reset statistics")
@@ -298,7 +365,16 @@ class AdminServer(BaseAdminServer):
         ws = web.WebSocketResponse()
         await ws.prepare(request)
         socket_id = str(uuid.uuid4())
-        queue = await self.context.inject(BaseOutboundMessageQueue)
+        queue = BasicMessageQueue()
+        loop = asyncio.get_event_loop()
+
+        if self.admin_insecure_mode:
+            # open to send websocket messages without api key auth
+            queue.authenticated = True
+        else:
+            header_admin_api_key = request.headers.get("x-api-key")
+            # authenticated via http header?
+            queue.authenticated = header_admin_api_key == self.admin_api_key
 
         try:
             self.websocket_queues[socket_id] = queue
@@ -306,6 +382,7 @@ class AdminServer(BaseAdminServer):
                 {
                     "topic": "settings",
                     "payload": {
+                        "authenticated": queue.authenticated,
                         "label": self.context.settings.get("default_label"),
                         "endpoint": self.context.settings.get("default_endpoint"),
                         "no_receive_invites": self.context.settings.get(
@@ -317,19 +394,59 @@ class AdminServer(BaseAdminServer):
             )
 
             closed = False
+            receive = loop.create_task(ws.receive_json())
+            send = loop.create_task(queue.dequeue(timeout=5.0))
+
             while not closed:
                 try:
-                    msg = await queue.dequeue(timeout=5.0)
-                    if msg is None:
-                        # we send fake pings because the JS client
-                        # can't detect real ones
-                        msg = {"topic": "ping"}
+                    await asyncio.wait(
+                        (receive, send), return_when=asyncio.FIRST_COMPLETED
+                    )
                     if ws.closed:
                         closed = True
-                    if msg and not closed:
-                        await ws.send_json(msg)
+
+                    if receive.done():
+                        if not closed:
+                            msg_received = None
+                            msg_api_key = None
+                            try:
+                                # this call can re-raise exeptions from inside the task
+                                msg_received = receive.result()
+                                msg_api_key = msg_received.get("x-api-key")
+                            except Exception:
+                                LOGGER.exception(
+                                    "Exception in websocket receiving task:"
+                                )
+                            if self.admin_api_key and self.admin_api_key == msg_api_key:
+                                # authenticated via websocket message
+                                queue.authenticated = True
+
+                            receive = loop.create_task(ws.receive_json())
+
+                    if send.done():
+                        try:
+                            msg = send.result()
+                        except asyncio.TimeoutError:
+                            msg = None
+
+                        if msg is None:
+                            # we send fake pings because the JS client
+                            # can't detect real ones
+                            msg = {
+                                "topic": "ping",
+                                "authenticated": queue.authenticated,
+                            }
+                        if not closed:
+                            if msg:
+                                await ws.send_json(msg)
+                            send = loop.create_task(queue.dequeue(timeout=5.0))
                 except asyncio.CancelledError:
                     closed = True
+
+            if not receive.done():
+                receive.cancel()
+            if not send.done():
+                send.cancel()
 
         finally:
             del self.websocket_queues[socket_id]
@@ -337,11 +454,14 @@ class AdminServer(BaseAdminServer):
         return ws
 
     def add_webhook_target(
-        self, target_url: str, topic_filter: Sequence[str] = None, retries: int = None
+        self,
+        target_url: str,
+        topic_filter: Sequence[str] = None,
+        max_attempts: int = None,
     ):
         """Add a webhook target."""
         self.webhook_targets[target_url] = WebhookTarget(
-            target_url, topic_filter, retries
+            target_url, topic_filter, max_attempts
         )
 
     def remove_webhook_target(self, target_url: str):
@@ -351,56 +471,13 @@ class AdminServer(BaseAdminServer):
 
     async def send_webhook(self, topic: str, payload: dict):
         """Add a webhook to the queue, to send to all registered targets."""
-        if not self.webhook_queue:
-            self.webhook_queue = await self.context.inject(BaseOutboundMessageQueue)
-            self.webhook_task = asyncio.ensure_future(self._process_webhooks())
-        await self.webhook_queue.enqueue((topic, payload))
+        if self.webhook_router:
+            for idx, target in self.webhook_targets.items():
+                if not target.topic_filter or topic in target.topic_filter:
+                    self.webhook_router(
+                        topic, payload, target.endpoint, target.max_attempts
+                    )
 
-    async def _process_webhooks(self):
-        """Continuously poll webhook queue and dispatch to targets."""
-        self.webhook_session = ClientSession()
-        self.webhook_processor = TaskProcessor(max_pending=5)
-        async for topic, payload in self.webhook_queue:
-            for queue in self.websocket_queues.values():
+        for queue in self.websocket_queues.values():
+            if queue.authenticated or topic in ("ping", "settings"):
                 await queue.enqueue({"topic": topic, "payload": payload})
-            if self.webhook_targets:
-                targets = self.webhook_targets.copy()
-                for idx, target in targets.items():
-                    if topic == "connections_activity":
-                        # filter connections activity by default (only sent to sockets)
-                        continue
-                    if not target.topic_filter or topic in target.topic_filter:
-                        retries = (
-                            self.webhook_retries
-                            if target.retries is None
-                            else target.retries
-                        )
-                        await self.webhook_processor.run_retry(
-                            lambda pending: self._perform_send_webhook(
-                                target.endpoint, topic, payload, pending.attempts + 1
-                            ),
-                            ident=(target.endpoint, topic),
-                            retries=retries,
-                        )
-            self.webhook_queue.task_done()
-
-    async def _perform_send_webhook(
-        self, target_url: str, topic: str, payload: dict, attempt: int = None
-    ):
-        """Dispatch a webhook to a specific endpoint."""
-        full_webhook_url = f"{target_url}/topic/{topic}/"
-        attempt_str = f" (attempt {attempt})" if attempt else ""
-        LOGGER.debug("Sending webhook to : %s%s", full_webhook_url, attempt_str)
-        async with self.webhook_session.post(
-            full_webhook_url, json=payload
-        ) as response:
-            if response.status < 200 or response.status > 299:
-                raise Exception("Unexpected response status")
-
-    async def complete_webhooks(self):
-        """Wait for all pending webhooks to be dispatched, used in testing."""
-        if self.webhook_queue:
-            await self.webhook_queue.join()
-        self.webhook_queue.stop()
-        if self.webhook_processor:
-            await self.webhook_processor.wait_done()

@@ -1,17 +1,50 @@
 """Utilities related to logging."""
 
-from logging import getLogger
+import logging
+from io import TextIOWrapper
 from logging.config import fileConfig
-from os import path
+from typing import TextIO
+
+import pkg_resources
 
 from ..version import __version__
+
+
+DEFAULT_LOGGING_CONFIG_PATH = "aries_cloudagent.config:default_logging_config.ini"
+
+
+def load_resource(path: str, encoding: str = None) -> TextIO:
+    """
+    Open a resource file located in a python package or the local filesystem.
+
+    Args:
+        path: The resource path in the form of `dir/file` or `package:dir/file`
+    Returns:
+        A file-like object representing the resource
+    """
+    components = path.rsplit(":", 1)
+    try:
+        if len(components) == 1:
+            return open(components[0], encoding=encoding)
+        else:
+            bstream = pkg_resources.resource_stream(components[0], components[1])
+            if encoding:
+                return TextIOWrapper(bstream, encoding=encoding)
+            return bstream
+    except IOError:
+        pass
 
 
 class LoggingConfigurator:
     """Utility class used to configure logging and print an informative start banner."""
 
     @classmethod
-    def configure(cls, logging_config_path: str = None, log_level: str = None):
+    def configure(
+        cls,
+        logging_config_path: str = None,
+        log_level: str = None,
+        log_file: str = None,
+    ):
         """
         Configure logger.
 
@@ -23,19 +56,30 @@ class LoggingConfigurator:
         if logging_config_path is not None:
             config_path = logging_config_path
         else:
-            config_path = path.join(
-                path.dirname(path.abspath(__file__)), "default_logging_config.ini"
-            )
+            config_path = DEFAULT_LOGGING_CONFIG_PATH
 
-        fileConfig(config_path, disable_existing_loggers=False)
+        log_config = load_resource(config_path, "utf-8")
+        if log_config:
+            with log_config:
+                fileConfig(log_config, disable_existing_loggers=False)
+        else:
+            logging.basicConfig(level=logging.WARNING)
+            logging.root.warning(f"Logging config file not found: {config_path}")
+
+        if log_file:
+            logging.root.handlers.clear()
+            logging.root.handlers.append(
+                logging.FileHandler(log_file, encoding="utf-8")
+            )
 
         if log_level:
             log_level = log_level.upper()
-            getLogger().setLevel(log_level)
+            logging.root.setLevel(log_level)
 
     @classmethod
     def print_banner(
         cls,
+        agent_label,
         inbound_transports,
         outbound_transports,
         public_did,
@@ -47,6 +91,7 @@ class LoggingConfigurator:
         Print a startup banner describing the configuration.
 
         Args:
+            agent_label: Agent Label
             inbound_transports: Configured inbound transports
             outbound_transports: Configured outbound transports
             admin_server: Admin server info
@@ -68,7 +113,7 @@ class LoggingConfigurator:
                 + f" {content} {border_character}{border_character}"
             )
 
-        banner_title_string = "Aries Cloud Agent"
+        banner_title_string = agent_label or "ACA"
         banner_title_spacer = " " * (banner_length - len(banner_title_string))
 
         banner_border = border_character * (banner_length + 6)
@@ -84,7 +129,7 @@ class LoggingConfigurator:
         )
 
         inbound_transport_strings = []
-        for transport in inbound_transports:
+        for transport in inbound_transports.values():
             host_port_string = (
                 f"  - {transport.scheme}://{transport.host}:{transport.port}"
             )
@@ -97,11 +142,13 @@ class LoggingConfigurator:
         )
 
         outbound_transport_strings = []
-        for schemes in outbound_transports:
-            for scheme in schemes:
-                schema_string = f"  - {scheme}"
-                scheme_spacer = " " * (banner_length - len(schema_string))
-                outbound_transport_strings.append((schema_string, scheme_spacer))
+        schemes = set().union(
+            *(transport.schemes for transport in outbound_transports.values())
+        )
+        for scheme in sorted(schemes):
+            schema_string = f"  - {scheme}"
+            scheme_spacer = " " * (banner_length - len(schema_string))
+            outbound_transport_strings.append((schema_string, scheme_spacer))
 
         version_string = f"ver: {__version__}"
         version_string_spacer = " " * (banner_length - len(version_string))

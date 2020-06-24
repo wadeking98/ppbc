@@ -4,27 +4,27 @@ cd $(dirname $0)
 
 if [ $1 == "build" ] 
 then
-	sudo ~/von/manage build
-	sudo pip3 install -r requirements.txt
-	sudo pip3 install -r requirements.dev.txt
+	~/von/manage build
+	pip3 install -r requirements.txt
+	pip3 install -r requirements.dev.txt
 	
 	cd django
-	sudo python3 -m venv .
+	python3 -m venv .
 	source bin/activate
-	sudo pip3 install -r requirements.txt
+	pip3 install -r requirements.txt
 	
 	cd ppbc
-	sudo python3 manage.py makemigrations
-	sudo python3 manage.py makemigrations backend
-	sudo python3 manage.py migrate
+	python3 manage.py makemigrations
+	python3 manage.py makemigrations backend
+	python3 manage.py migrate
 
 	cd frontend
-	sudo npm install
+	npm install
 
 elif [ $1 == "start" ]
 then ## start docker containers and run django server
-	sudo scripts/startapp
-	sudo python3 django/ppbc/manage.py runserver
+	scripts/startapp
+	python3 django/ppbc/manage.py runserver
 
 
 elif [ $1 == "kill" ]

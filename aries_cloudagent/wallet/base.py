@@ -4,13 +4,10 @@ from abc import ABC, abstractmethod
 from collections import namedtuple
 from typing import Sequence
 
+
 KeyInfo = namedtuple("KeyInfo", "verkey metadata")
 
 DIDInfo = namedtuple("DIDInfo", "did verkey metadata")
-
-PairwiseInfo = namedtuple(
-    "PairwiseInfo", "their_did their_verkey my_did my_verkey metadata"
-)
 
 
 class BaseWallet(ABC):
@@ -27,6 +24,16 @@ class BaseWallet(ABC):
         """
 
     @property
+    @abstractmethod
+    def name(self) -> str:
+        """Accessor for the wallet name."""
+
+    @property
+    @abstractmethod
+    def type(self) -> str:
+        """Accessor for the wallet type."""
+
+    @property
     def handle(self):
         """
         Get internal wallet reference.
@@ -38,15 +45,14 @@ class BaseWallet(ABC):
         return None
 
     @property
+    @abstractmethod
+    def created(self) -> bool:
+        """Check whether the wallet was created on the last open call."""
+
+    @property
+    @abstractmethod
     def opened(self) -> bool:
-        """
-        Check whether wallet is currently open.
-
-        Returns:
-            Defaults to False
-
-        """
-        return False
+        """Check whether wallet is currently open."""
 
     @abstractmethod
     async def open(self):
@@ -60,8 +66,7 @@ class BaseWallet(ABC):
     async def create_signing_key(
         self, seed: str = None, metadata: dict = None
     ) -> KeyInfo:
-        """
-        Create a new public/private signing keypair.
+        """Create a new public/private signing keypair.
 
         Args:
             seed: Optional seed allowing deterministic key creation
@@ -93,6 +98,37 @@ class BaseWallet(ABC):
         Args:
             verkey: The verification key of the keypair
             metadata: The new metadata to store
+
+        """
+
+    @abstractmethod
+    async def rotate_did_keypair_start(self, did: str, next_seed: str = None) -> str:
+        """
+        Begin key rotation for DID that wallet owns: generate new keypair.
+
+        Args:
+            did: signing DID
+            next_seed: seed for incoming ed25519 key pair (default random)
+
+        Returns:
+            The new verification key
+
+        Raises:
+            WalletNotFoundError: if wallet does not own DID
+
+        """
+
+    @abstractmethod
+    async def rotate_did_keypair_apply(self, did: str) -> None:
+        """
+        Apply temporary keypair as main for DID that wallet owns.
+
+        Args:
+            did: signing DID
+
+        Raises:
+            WalletNotFoundError: if wallet does not own DID
+            WalletError: if wallet has not started key rotation
 
         """
 
@@ -155,6 +191,35 @@ class BaseWallet(ABC):
 
         return None
 
+    async def set_public_did(self, did: str) -> DIDInfo:
+        """
+        Assign the public did.
+
+        Returns:
+            The created `DIDInfo`
+
+        """
+
+        # will raise an exception if not found
+        info = None if did is None else await self.get_local_did(did)
+
+        public = await self.get_public_did()
+        if public and info and public.did == info.did:
+            info = public
+        else:
+            if public:
+                metadata = public.metadata.copy()
+                del metadata["public"]
+                await self.replace_local_did_metadata(public.did, metadata)
+
+            if info:
+                metadata = info.metadata.copy()
+                metadata["public"] = True
+                await self.replace_local_did_metadata(info.did, metadata)
+                info = await self.get_local_did(info.did)
+
+        return info
+
     @abstractmethod
     async def get_local_dids(self) -> Sequence[DIDInfo]:
         """
@@ -203,75 +268,6 @@ class BaseWallet(ABC):
         """
 
     @abstractmethod
-    async def create_pairwise(
-        self,
-        their_did: str,
-        their_verkey: str,
-        my_did: str = None,
-        metadata: dict = None,
-    ) -> PairwiseInfo:
-        """
-        Create a new pairwise DID for a secure connection.
-
-        Args:
-            their_did: Their DID
-            their_verkey: Their verkey
-            my_did: My DID
-            metadata: Metadata for relationship
-
-        Returns:
-            A `PairwiseInfo` instance representing the new relationship
-
-        """
-
-    @abstractmethod
-    async def get_pairwise_list(self) -> Sequence[PairwiseInfo]:
-        """
-        Get list of defined pairwise DIDs.
-
-        Returns:
-            A list of `PairwiseInfo` instances for all relationships
-
-        """
-
-    @abstractmethod
-    async def get_pairwise_for_did(self, their_did: str) -> PairwiseInfo:
-        """
-        Find info for a pairwise DID.
-
-        Args:
-            their_did: The DID representing the relationship
-
-        Returns:
-            A `PairwiseInfo` instance representing the relationship
-
-        """
-
-    @abstractmethod
-    async def get_pairwise_for_verkey(self, their_verkey: str) -> PairwiseInfo:
-        """
-        Resolve a pairwise DID from a verkey.
-
-        Args:
-            their_verkey: The verkey representing the relationship
-
-        Returns:
-            A `PairwiseInfo` instance representing the relationship
-
-        """
-
-    @abstractmethod
-    async def replace_pairwise_metadata(self, their_did: str, metadata: dict):
-        """
-        Replace the metadata associated with a pairwise DID.
-
-        Args:
-            their_did: The did representing the relationship
-            metadata: The new metadata
-
-        """
-
-    @abstractmethod
     async def sign_message(self, message: bytes, from_verkey: str) -> bytes:
         """
         Sign a message using the private key associated with a given verkey.
@@ -299,42 +295,6 @@ class BaseWallet(ABC):
 
         Returns:
             True if verified, else False
-
-        """
-
-    @abstractmethod
-    async def encrypt_message(
-        self, message: bytes, to_verkey: str, from_verkey: str = None
-    ) -> bytes:
-        """
-        Apply auth_crypt or anon_crypt to a message.
-
-        Args:
-            message: The binary message content
-            to_verkey: The verkey of the recipient
-            from_verkey: The verkey of the sender. If provided then auth_crypt is used,
-                otherwise anon_crypt is used.
-
-        Returns:
-            The encrypted message content
-
-        """
-
-    @abstractmethod
-    async def decrypt_message(
-        self, enc_message: bytes, to_verkey: str, use_auth: bool
-    ) -> (bytes, str):
-        """
-        Decrypt a message assembled by auth_crypt or anon_crypt.
-
-        Args:
-            enc_message: The encrypted message content
-            to_verkey: The verkey of the recipient. If provided then auth_decrypt is
-                used, otherwise anon_decrypt is used.
-
-        Returns:
-            A tuple of the decrypted message content and sender verkey
-                (None for anon_crypt)
 
         """
 
@@ -367,10 +327,6 @@ class BaseWallet(ABC):
             A tuple: (message, from_verkey, to_verkey)
 
         """
-
-    # TODO:
-    # store credential (return ID)
-    # fetch credentials by ID [or query, filter, proof request?]
 
     def __repr__(self) -> str:
         """Get a human readable string."""
